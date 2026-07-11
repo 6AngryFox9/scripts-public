@@ -1,0 +1,3988 @@
+-- https://lua.expert/
+local Debris = game:GetService("Debris")
+local RunService, TweenService, UserInputService, Workspace, LocalPlayer, FishingRequest, FishingState, v1, v2, v6, v7, v8, v9, v13, v14, v15, v16, v17, v21, v22, v23, v24, v25, v26, v27, v28, FishButton, FishingCancelButton, v34, v35, scaleFishingStrokes, refreshFishingButtonLayout, FishingStatus, UIStroke, FishingRhythmLayer, FishingRewardBar, t5, applyRewardTemplate, refreshWaterParts, isNearWater, v44, showPrompt, showCancelButton, setFishingHudHidden, playFishingSound, startFishingRhythmLoop, playFishingRewardSequence, resetRewardStageFills, updateRewardBar, updateRhythmStageBar, clearRhythm
+
+do
+	local Players = game:GetService("Players")
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+	RunService = game:GetService("RunService")
+
+	local SoundService = game:GetService("SoundService")
+
+	TweenService = game:GetService("TweenService")
+	UserInputService = game:GetService("UserInputService")
+	Workspace = game:GetService("Workspace")
+	LocalPlayer = Players.LocalPlayer
+
+	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+	local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+	FishingRequest = Remotes:WaitForChild("FishingRequest")
+	FishingState = Remotes:WaitForChild("FishingState")
+	v1 = Remotes:FindFirstChild("GetSkillTreeState") or Remotes:WaitForChild("GetSkillTreeState", 5)
+	v2 = Remotes:FindFirstChild("SkillTreeChanged") or Remotes:WaitForChild("SkillTreeChanged", 5)
+
+	local Config = ReplicatedStorage:WaitForChild("FishingSystem"):WaitForChild("Config")
+	local v3 = 30
+	local v4 = nil
+	local v5 = nil
+
+	local function isWithinFishableShoreBand(p1) --[[ isWithinFishableShoreBand | Line: 32 | Upvalues: v5 (ref) ]]
+		if not (p1 and v5) then
+			return true
+		end
+
+		local v1, v2 = v5()
+
+		if not (v1 and v2) then
+			return true
+		end
+
+		local Magnitude = Vector3.new(p1.X - v1.X, 0, p1.Z - v1.Z).Magnitude
+
+		return if v2 - 42 <= Magnitude then Magnitude <= v2 + 80 else false
+	end
+
+	v6 = false
+	v7 = false
+	v8 = false
+	v9 = false
+
+	local t = {}
+	local v10 = 0
+	local v11 = true
+	local v12 = 0
+
+	v13 = 0
+	v14 = nil
+	v15 = nil
+	v16 = -1
+	v17 = false
+
+	local t2 = { "One", "Two", "Three", "Four", "Five", "Six" }
+	local v18 = nil
+	local v19 = nil
+	local v20 = 0
+
+	local function clearNearWaterCache() --[[ clearNearWaterCache | Line: 68 | Upvalues: v13 (ref), v14 (ref), v15 (ref), v16 (ref), v17 (ref) ]]
+		v13 = 0
+		v14 = nil
+		v15 = nil
+		v16 = -1
+		v17 = false
+	end
+
+	local function getTowerBounds() --[[ getTowerBounds | Line: 76 | Upvalues: v18 (ref), v19 (ref), v20 (ref), Workspace (copy), t2 (copy) ]]
+		local v1 = os.clock()
+
+		if v18 and (v19 and v1 < v20) then
+			return v18, v19
+		end
+
+		v20 = v1 + 1
+
+		local Position = Workspace:FindFirstChild("Position")
+
+		if not Position then
+			v18 = nil
+			v19 = nil
+
+			return nil, nil
+		end
+
+		local v2 = nil
+		local v3 = nil
+
+		for i, v in ipairs(t2) do
+			local v4, v5
+			local v6 = Position:FindFirstChild(v)
+
+			if v6 and v6:IsA("BasePart") then
+				local v7 = v6.Size * 0.5
+				local v8 = v6.Position - v7
+				local v9 = v6.Position + v7
+
+				v4 = v2 and Vector3.new(math.min(v2.X, v8.X), math.min(v2.Y, v8.Y), (math.min(v2.Z, v8.Z))) or v8
+
+				if v3 then
+					local v13 = math.max(v3.X, v9.X)
+
+					v5 = Vector3.new(v13, math.max(v3.Y, v9.Y), (math.max(v3.Z, v9.Z)))
+					v2 = v4
+
+					if v5 then
+					else
+						v5 = v9
+					end
+				else
+					v5 = v9
+					v2 = v4
+				end
+
+				v3 = v5
+			end
+		end
+
+		if v2 then
+			local v16 = v2 - Vector3.new(12, 70, 12)
+			local v17 = v3 + Vector3.new(12, 75, 12)
+
+			v18 = CFrame.new((v16 + v17) * 0.5)
+			v19 = v17 - v16
+
+			return v18, v19
+		end
+
+		v18 = nil
+		v19 = nil
+
+		return nil, nil
+	end
+
+	local function isPositionInTower(p1) --[[ isPositionInTower | Line: 113 | Upvalues: getTowerBounds (copy) ]]
+		if not p1 then
+			return false
+		end
+
+		local v1, v2 = getTowerBounds()
+
+		if not (v1 and v2) then
+			return false
+		end
+
+		local v3 = v1:PointToObjectSpace(p1)
+		local v4 = v2 * 0.5
+
+		return if math.abs(v3.X) <= v4.X then if math.abs(v3.Y) <= v4.Y then math.abs(v3.Z) <= v4.Z else false else false
+	end
+
+	v21 = nil
+	v22 = false
+	v23 = false
+	v24 = nil
+	v25 = nil
+	v26 = nil
+	v27 = nil
+	v28 = 0
+
+	local FishingGui = Instance.new("ScreenGui")
+
+	FishingGui.Name = "FishingGui"
+	FishingGui.IgnoreGuiInset = true
+	FishingGui.ResetOnSpawn = false
+	FishingGui.DisplayOrder = 72
+	FishingGui.Parent = PlayerGui
+
+	local v29 = PlayerGui:WaitForChild("MainUI", 8) or game.StarterGui:FindFirstChild("MainUI")
+
+	local function getMainUI() --[[ getMainUI | Line: 146 | Upvalues: PlayerGui (copy), v29 (ref) ]]
+		local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+		if not MainUI then
+			return v29
+		end
+
+		v29 = MainUI
+
+		return MainUI
+	end
+
+	local function applyFishingSkillState(p1) --[[ applyFishingSkillState | Line: 154 | Upvalues: v8 (ref) ]]
+		if type(p1) ~= "table" then
+			return
+		end
+
+		if type(p1.Unlocked) ~= "table" then
+			return
+		end
+
+		v8 = p1.Unlocked.fishing == true
+	end
+
+	local function refreshFishingSkillState() --[[ refreshFishingSkillState | Line: 160 | Upvalues: v1 (copy), v8 (ref) ]]
+		if not v1 then
+			return
+		end
+
+		local ok, result = pcall(function() --[[ Line: 164 | Upvalues: v1 (ref) ]]
+			return v1:InvokeServer()
+		end)
+
+		if not ok or type(result) ~= "table" then
+			return
+		end
+
+		if type(result.Unlocked) ~= "table" then
+			return
+		end
+
+		v8 = result.Unlocked.fishing == true
+	end
+
+	local v30 = v29 and v29:FindFirstChild("Frames")
+	local v31 = if v30 then v30:FindFirstChild("Fish") else v30
+
+	if v31 and v31:IsA("GuiObject") then
+		v31.Visible = false
+	end
+
+	local function makeFallbackFishButton() --[[ makeFallbackFishButton | Line: 178 ]]
+		local FishButton = Instance.new("TextButton")
+
+		FishButton.Name = "FishButton"
+		FishButton.BackgroundColor3 = Color3.fromRGB(48, 210, 88)
+		FishButton.BorderSizePixel = 0
+		FishButton.Text = "Fish!"
+		FishButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		FishButton.TextScaled = true
+		FishButton.Font = Enum.Font.FredokaOne
+
+		local UICorner = Instance.new("UICorner")
+
+		UICorner.CornerRadius = UDim.new(0.18, 0)
+		UICorner.Parent = FishButton
+
+		local UIStroke = Instance.new("UIStroke")
+
+		UIStroke.Color = Color3.fromRGB(20, 95, 42)
+		UIStroke.Thickness = 3
+		UIStroke.Parent = FishButton
+
+		return FishButton
+	end
+
+	FishButton = v31 and v31:IsA("GuiObject") and v31:Clone() or makeFallbackFishButton()
+	FishButton.Name = "FishButton"
+	FishButton.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishButton.AutoButtonColor = false
+	FishButton.Visible = false
+	FishButton.Parent = FishingGui
+
+	local v32 = v29 and v29:FindFirstChild("Hexagonal") and v29.Hexagonal:FindFirstChild("Close")
+
+	FishingCancelButton = v32 and v32:IsA("GuiButton") and v32:Clone() or makeFallbackFishButton()
+	FishingCancelButton.Name = "FishingCancelButton"
+	FishingCancelButton.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingCancelButton.AutoButtonColor = false
+	FishingCancelButton.Visible = false
+	FishingCancelButton.Parent = FishingGui
+
+	local function keepSingleCancelTextLabel(p1) --[[ keepSingleCancelTextLabel | Line: 212 ]]
+		local Title = p1:FindFirstChild("Title", true)
+
+		if not (Title and Title:IsA("TextLabel")) then
+			Title = nil
+
+			for i, v in ipairs(p1:GetDescendants()) do
+				if v:IsA("TextLabel") then
+					Title = v
+
+					break
+				end
+			end
+		end
+
+		for i, v in ipairs(p1:GetDescendants()) do
+			if v:IsA("TextLabel") and v ~= Title then
+				v.Visible = false
+				v.Text = ""
+			end
+		end
+
+		return Title
+	end
+
+	local function setButtonText(p1, p2) --[[ setButtonText | Line: 232 ]]
+		if p1:IsA("TextButton") then
+			p1.Text = ""
+		elseif p1:IsA("TextLabel") then
+			p1.Text = p2
+			p1.TextTransparency = 0
+			p1.TextColor3 = Color3.fromRGB(255, 255, 255)
+			p1.TextScaled = true
+			p1.Visible = true
+		end
+
+		for i, v in ipairs(p1:GetDescendants()) do
+			if v:IsA("TextLabel") or v:IsA("TextButton") then
+				v.Text = p2
+				v.TextTransparency = 0
+				v.TextColor3 = Color3.fromRGB(255, 255, 255)
+				v.TextScaled = true
+				v.Visible = true
+			end
+		end
+	end
+
+	setButtonText(FishButton, "Fish!")
+	setButtonText(FishingCancelButton, "Cancel")
+
+	local v33 = keepSingleCancelTextLabel(FishingCancelButton)
+
+	if v33 then
+		v33.Text = "Cancel"
+		v33.Visible = true
+		v33.TextTransparency = 0
+	end
+
+	v34 = FishButton:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	v34.Scale = 0
+	v34.Parent = FishButton
+	v35 = FishingCancelButton:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	v35.Scale = 0
+	v35.Parent = FishingCancelButton
+
+	local function getViewportKind() --[[ getViewportKind | Line: 270 | Upvalues: Workspace (copy), UserInputService (copy) ]]
+		if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then
+			return "Phone"
+		end
+
+		if UserInputService.TouchEnabled then
+			return "Tablet"
+		end
+
+		return "Desktop"
+	end
+
+	local function getStrokeScale() --[[ getStrokeScale | Line: 281 | Upvalues: Workspace (copy), UserInputService (copy) ]]
+		local v2 = if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+
+		if v2 == "Phone" then
+			return 0.52
+		end
+
+		if v2 == "Tablet" then
+			return 0.72
+		end
+
+		return 1
+	end
+
+	scaleFishingStrokes = function(p1) --[[ scaleFishingStrokes | Line: 291 | Upvalues: Workspace (copy), UserInputService (copy) ]]
+		local v2 = if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+		local v3 = if v2 == "Phone" then 0.52 elseif v2 == "Tablet" then 0.72 else 1
+
+		for i, v in ipairs(p1:GetDescendants()) do
+			if v:IsA("UIStroke") then
+				if v:GetAttribute("FishingBaseThickness") == nil then
+					v:SetAttribute("FishingBaseThickness", v.Thickness)
+				end
+
+				v.Thickness = math.max(1, (v:GetAttribute("FishingBaseThickness") or v.Thickness) * v3)
+			end
+		end
+	end
+
+	local v36 = UDim2.fromScale(0.5, 0.78)
+	local v37 = UDim2.fromScale(0.5, 0.78)
+	local v38 = nil
+	local v39 = UDim2.fromScale(0.5, 0.88)
+
+	local function getGuiCenterScale(p1) --[[ getGuiCenterScale | Line: 308 | Upvalues: Workspace (copy) ]]
+		local CurrentCamera = Workspace.CurrentCamera
+		local v1 = if CurrentCamera then CurrentCamera.ViewportSize else CurrentCamera
+
+		if not p1 or (not p1:IsA("GuiObject") or (not v1 or (v1.X <= 0 or v1.Y <= 0))) then
+			return nil
+		end
+
+		if p1.AbsoluteSize.X <= 0 or p1.AbsoluteSize.Y <= 0 then
+			return nil
+		end
+
+		local v2 = p1.AbsolutePosition + Vector2.new(p1.AbsoluteSize.X * p1.AnchorPoint.X, p1.AbsoluteSize.Y * p1.AnchorPoint.Y)
+
+		return UDim2.fromScale(v2.X / v1.X, v2.Y / v1.Y)
+	end
+
+	local function getGuiTopCenterScale(p1) --[[ getGuiTopCenterScale | Line: 321 | Upvalues: Workspace (copy) ]]
+		local CurrentCamera = Workspace.CurrentCamera
+		local v1 = if CurrentCamera then CurrentCamera.ViewportSize else CurrentCamera
+
+		if not p1 or (not p1:IsA("GuiObject") or (not v1 or (v1.X <= 0 or v1.Y <= 0))) then
+			return nil
+		end
+
+		if p1.AbsoluteSize.X <= 0 or p1.AbsoluteSize.Y <= 0 then
+			return nil
+		end
+
+		local v2 = p1.AbsolutePosition + Vector2.new(p1.AbsoluteSize.X * 0.5, 0)
+
+		return UDim2.fromScale(v2.X / v1.X, v2.Y / v1.Y)
+	end
+
+	local function screenPointToFishingScale(p1, p2) --[[ screenPointToFishingScale | Line: 334 | Upvalues: FishingGui (copy), Workspace (copy) ]]
+		local AbsolutePosition = FishingGui.AbsolutePosition
+		local AbsoluteSize = FishingGui.AbsoluteSize
+
+		if not (AbsoluteSize.X <= 0 or AbsoluteSize.Y <= 0) then
+			local v2 = math.clamp((p1 - AbsolutePosition.X) / AbsoluteSize.X, 0.08, 0.92)
+
+			return v2, math.clamp((p2 - AbsolutePosition.Y) / AbsoluteSize.Y, 0.05, 0.94)
+		end
+
+		local v4 = Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+
+		return math.clamp(p1 / math.max(1, v4.X), 0.08, 0.92), math.clamp(p2 / math.max(1, v4.Y), 0.05, 0.94)
+	end
+
+	local function findRollButton() --[[ findRollButton | Line: 345 | Upvalues: LocalPlayer (copy) ]]
+		local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui")
+		local v1 = if PlayerGui then PlayerGui:FindFirstChild("Main") else PlayerGui
+		local v2 = if v1 then v1:FindFirstChild("RollButton") else v1
+
+		if v2 and v2:IsA("GuiObject") then
+			return v2
+		end
+
+		local Main = game.StarterGui:FindFirstChild("Main")
+		local v3 = if Main then Main:FindFirstChild("RollButton") else Main
+
+		if v3 and v3:IsA("GuiObject") then
+			return v3
+		end
+
+		return nil
+	end
+
+	local function getRollDiceTopScale() --[[ getRollDiceTopScale | Line: 360 | Upvalues: findRollButton (copy), screenPointToFishingScale (copy) ]]
+		local v1 = findRollButton()
+
+		if not (v1 and v1:IsA("GuiObject")) then
+			return 0.5, 0.79, false
+		end
+
+		local v2 = (1 / 0)
+		local v3 = (1 / 0)
+		local v4 = (-1 / 0)
+		local v5 = (-1 / 0)
+		local v6 = false
+
+		local function includeVisualBounds(p1) --[[ includeVisualBounds | Line: 368 | Upvalues: v6 (ref), v2 (ref), v3 (ref), v4 (ref), v5 (ref) ]]
+			if not (p1 and (p1:IsA("GuiObject") and (p1.Visible and (p1.AbsoluteSize.X > 2 and p1.AbsoluteSize.Y > 2)))) then
+				return
+			end
+
+			if if p1:IsA("ImageLabel") or p1:IsA("ImageButton") then if tostring(p1.Image or "") == "" then false elseif p1.ImageTransparency < 0.98 then true else false elseif p1:IsA("TextLabel") or p1:IsA("TextButton") then if tostring(p1.Text or "") == "" then false elseif p1.TextTransparency < 0.98 then true else false elseif p1.BackgroundTransparency < 0.98 then true else false then
+				v6 = true
+				v2 = math.min(v2, p1.AbsolutePosition.X)
+				v3 = math.min(v3, p1.AbsolutePosition.Y)
+				v4 = math.max(v4, p1.AbsolutePosition.X + p1.AbsoluteSize.X)
+				v5 = math.max(v5, p1.AbsolutePosition.Y + p1.AbsoluteSize.Y)
+			end
+		end
+
+		local DiceStatus = v1:FindFirstChild("DiceStatus")
+
+		if DiceStatus and DiceStatus:IsA("GuiObject") then
+			for i, v in ipairs({ "GoldenDiceIndicator", "RainbowDiceIndicator" }) do
+				local v7 = DiceStatus:FindFirstChild(v)
+
+				if v7 and v7:IsA("GuiObject") then
+					for i2, v8 in ipairs(v7:GetDescendants()) do
+						includeVisualBounds(v8)
+					end
+
+					includeVisualBounds(v7)
+				end
+			end
+		end
+
+		if v6 then
+			local v8, v9 = screenPointToFishingScale(v1.AbsolutePosition.X + v1.AbsoluteSize.X * 0.5, v3)
+
+			return v8, v9, true
+		end
+
+		local v10 = v1.AbsolutePosition + Vector2.new(v1.AbsoluteSize.X * 0.5, 0)
+		local v11, v12 = screenPointToFishingScale(v10.X, v10.Y)
+
+		return v11, v12, false
+	end
+
+	local function getInventoryItemCount() --[[ getInventoryItemCount | Line: 414 | Upvalues: LocalPlayer (copy) ]]
+		local t = {}
+		local v1 = 0
+
+		local function scan(p1) --[[ scan | Line: 417 | Upvalues: t (copy), v1 (ref) ]]
+			if not p1 then
+				return
+			end
+
+			for i, v in ipairs(p1:GetChildren()) do
+				if v:IsA("Tool") and not t[v.Name] then
+					t[v.Name] = true
+					v1 = v1 + 1
+				end
+			end
+		end
+
+		scan(LocalPlayer:FindFirstChildOfClass("Backpack"))
+		scan(LocalPlayer.Character)
+
+		if not (v1 <= 0) then
+			return v1
+		end
+
+		scan(LocalPlayer:FindFirstChild("StarterGear"))
+
+		return v1
+	end
+
+	local function findChestLabel() --[[ findChestLabel | Line: 436 | Upvalues: PlayerGui (copy), v29 (ref) ]]
+		local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+		if MainUI then
+			v29 = MainUI
+		end
+
+		local v1 = v29
+		local v2 = if v1 then v1:FindFirstChild("Button") else v1
+		local v3 = if v2 then v2:FindFirstChild("Chest", true) else v2
+
+		if v3 and v3:IsA("GuiObject") then
+			return v3
+		end
+
+		return nil
+	end
+
+	local function isGuiObjectVisuallyDrawn(p1) --[[ isGuiObjectVisuallyDrawn | Line: 446 ]]
+		if not (p1 and (p1:IsA("GuiObject") and p1.Visible)) then
+			return false
+		end
+
+		if p1:IsA("ImageLabel") or p1:IsA("ImageButton") then
+			return if tostring(p1.Image or "") == "" then false else p1.ImageTransparency < 0.98
+		end
+
+		if p1:IsA("TextLabel") or p1:IsA("TextButton") then
+			return if tostring(p1.Text or "") == "" then false else p1.TextTransparency < 0.98
+		end
+
+		return p1.BackgroundTransparency < 0.98
+	end
+
+	local function getVisibleBottomScaleWithin(p1) --[[ getVisibleBottomScaleWithin | Line: 458 | Upvalues: isGuiObjectVisuallyDrawn (copy) ]]
+		local v1 = 1
+		local v2 = false
+
+		local function v3(p12, p2, p3) --[[ visit | Line: 461 | Upvalues: p1 (copy), isGuiObjectVisuallyDrawn (ref), v1 (ref), v2 (ref), v3 (copy) ]]
+			if p12 ~= p1 and isGuiObjectVisuallyDrawn(p12) then
+				v1 = math.max(v1, p2 + p3)
+				v2 = true
+			end
+
+			for i, v in ipairs(p12:GetChildren()) do
+				if v:IsA("GuiObject") then
+					v3(v, p2 + (v.Position.Y.Scale - v.AnchorPoint.Y * v.Size.Y.Scale) * p3, v.Size.Y.Scale * p3)
+				end
+			end
+		end
+
+		v1 = if isGuiObjectVisuallyDrawn(p1) then 1 else 0
+		v2 = isGuiObjectVisuallyDrawn(p1)
+		v3(p1, 0, 1)
+
+		if v2 then
+			return math.clamp(v1, 0, 1.25)
+		end
+
+		return 1
+	end
+
+	local function getFishingButtonPosition(p1) --[[ getFishingButtonPosition | Line: 483 | Upvalues: v6 (ref), v36 (ref), getVisibleBottomScaleWithin (copy), FishButton (copy), getRollDiceTopScale (copy), v9 (ref), Workspace (copy), UserInputService (copy), FishingGui (copy) ]]
+		if v6 then
+			return v36
+		end
+
+		local v1 = if p1 then p1.Y.Scale or 0.06 else 0.06
+		local v2 = (getVisibleBottomScaleWithin(FishButton) - FishButton.AnchorPoint.Y) * v1
+		local v3, v4, v5 = getRollDiceTopScale()
+
+		if not v5 and (v9 and FishButton.Visible) then
+			return v36
+		end
+
+		local v8 = if (if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop") == "Phone" then 8 else 9
+		local v10 = UDim2.fromScale(v3, (math.clamp(v4 - v2 - v8 / math.max(1, FishingGui.AbsoluteSize.Y), 0.05, 0.94)))
+
+		v36 = v10
+
+		return v10
+	end
+
+	local function getRollButtonPosition(p1, p2) --[[ getRollButtonPosition | Line: 501 | Upvalues: v6 (ref), v39 (ref), findRollButton (copy), screenPointToFishingScale (copy), getRollDiceTopScale (copy) ]]
+		if v6 and not p1 then
+			return v39
+		end
+
+		local v1 = findRollButton()
+
+		if v1 and (v1:IsA("GuiObject") and (v1.AbsoluteSize.X > 0 and v1.AbsoluteSize.Y > 0)) then
+			local v2 = v1.AbsolutePosition + Vector2.new(v1.AbsoluteSize.X * 0.5, v1.AbsoluteSize.Y * 0.5)
+			local v3, v4 = screenPointToFishingScale(v2.X, v2.Y)
+
+			v39 = UDim2.fromScale(v3, v4)
+
+			return v39
+		end
+
+		local v5 = if p2 then p2.Y.Scale * 0.5 or 0.03 else 0.03
+		local v62, v7 = getRollDiceTopScale()
+		local v8 = UDim2.fromScale(v62, (math.clamp(v7 - v5, 0.05, 0.94)))
+
+		v39 = v8
+
+		return v8
+	end
+
+	fishingLayoutDescendantCache = fishingLayoutDescendantCache or setmetatable({}, {
+		__mode = "k"
+	})
+	fishingLayoutDescendantCacheBound = fishingLayoutDescendantCacheBound or setmetatable({}, {
+		__mode = "k"
+	})
+	fishingLayoutLastApplied = fishingLayoutLastApplied or setmetatable({}, {
+		__mode = "k"
+	})
+	function getFishingLayoutDescendants(p1) --[[ getFishingLayoutDescendants | Line: 523 ]]
+		local v1 = fishingLayoutDescendantCache[p1]
+
+		if v1 then
+			return v1
+		end
+
+		local v2 = p1:GetDescendants()
+
+		fishingLayoutDescendantCache[p1] = v2
+
+		if fishingLayoutDescendantCacheBound[p1] then
+			return v2
+		end
+
+		fishingLayoutDescendantCacheBound[p1] = true
+		p1.DescendantAdded:Connect(function() --[[ Line: 532 | Upvalues: p1 (copy) ]]
+			fishingLayoutDescendantCache[p1] = nil
+			fishingLayoutLastApplied[p1] = nil
+		end)
+		p1.DescendantRemoving:Connect(function() --[[ Line: 536 | Upvalues: p1 (copy) ]]
+			fishingLayoutDescendantCache[p1] = nil
+			fishingLayoutLastApplied[p1] = nil
+		end)
+
+		return v2
+	end
+	function applyFishingButtonLayout(p1, p2, p3) --[[ applyFishingButtonLayout | Line: 544 | Upvalues: FishingCancelButton (copy), scaleFishingStrokes (copy) ]]
+		local v1 = fishingLayoutLastApplied[p1]
+
+		if v1 and (v1.position == p2 and (v1.size == p3 and (p1.AnchorPoint == Vector2.new(0.5, 0.5) and p1.ZIndex == 40))) then
+			return
+		end
+
+		fishingLayoutLastApplied[p1] = {
+			position = p2,
+			size = p3
+		}
+		p1.AnchorPoint = Vector2.new(0.5, 0.5)
+		p1.Position = p2
+		p1.Size = p3
+		p1.ZIndex = 40
+
+		local v2 = if p1 == FishingCancelButton then FishingCancelButton:FindFirstChild("Title", true) or nil else nil
+
+		for i, v in ipairs(getFishingLayoutDescendants(p1)) do
+			if v:IsA("TextLabel") or v:IsA("TextButton") then
+				if p1 == FishingCancelButton and (v:IsA("TextLabel") and v ~= v2) then
+					v.Visible = false
+					v.Text = ""
+				else
+					v.Visible = true
+					v.TextTransparency = 0
+				end
+
+				v.ZIndex = math.max(v.ZIndex, p1.ZIndex + 4)
+
+				continue
+			end
+
+			if v:IsA("GuiObject") then
+				v.ZIndex = math.max(v.ZIndex, p1.ZIndex + 1)
+			end
+		end
+
+		scaleFishingStrokes(p1)
+	end
+	refreshFishingButtonLayout = function() --[[ refreshFishingButtonLayout | Line: 572 | Upvalues: Workspace (copy), UserInputService (copy), v38 (ref), v9 (ref), v6 (ref), v7 (ref), getFishingButtonPosition (copy), FishButton (copy), v37 (ref), v36 (ref), FishingCancelButton (copy) ]]
+		local v2 = if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+		local v3 = UDim2.fromScale(0.155, 0.058)
+
+		if v2 == "Phone" then
+			v3 = UDim2.fromScale(0.285, 0.062)
+		elseif v2 == "Tablet" then
+			v3 = UDim2.fromScale(0.205, 0.06)
+		end
+
+		local v62 = v38
+
+		if v9 and not (v6 or v7) then
+			local v72 = getFishingButtonPosition(v3)
+
+			v38 = v72
+			v62 = v72
+		end
+
+		applyFishingButtonLayout(FishButton, if v62 then v62 else getFishingButtonPosition(v3), v3)
+		applyFishingButtonLayout(FishingCancelButton, v37 or v38 or v36 or getFishingButtonPosition(v3), v3)
+	end
+	refreshFishingButtonLayout()
+	FishingStatus = Instance.new("TextLabel")
+	FishingStatus.Name = "FishingStatus"
+	FishingStatus.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingStatus.Position = UDim2.new(0.5, 0, 0.705, 0)
+	FishingStatus.Size = UDim2.new(0.34, 0, 0.052, 0)
+	FishingStatus.BackgroundTransparency = 1
+	FishingStatus.Text = ""
+	FishingStatus.TextColor3 = Color3.fromRGB(255, 255, 255)
+	FishingStatus.TextScaled = true
+	FishingStatus.Font = Enum.Font.FredokaOne
+	FishingStatus.Visible = false
+	FishingStatus.Parent = FishingGui
+	UIStroke = Instance.new("UIStroke")
+	UIStroke.Color = Color3.fromRGB(20, 20, 20)
+	UIStroke.Thickness = 2.5
+	UIStroke.Parent = FishingStatus
+	FishingRhythmLayer = Instance.new("Frame")
+	FishingRhythmLayer.Name = "FishingRhythmLayer"
+	FishingRhythmLayer.BackgroundTransparency = 1
+	FishingRhythmLayer.Size = UDim2.fromScale(1, 1)
+	FishingRhythmLayer.Visible = false
+	FishingRhythmLayer.Parent = FishingGui
+
+	local FishingRewardFxLayer = Instance.new("Frame")
+
+	FishingRewardFxLayer.Name = "FishingRewardFxLayer"
+	FishingRewardFxLayer.BackgroundTransparency = 1
+	FishingRewardFxLayer.Size = UDim2.fromScale(1, 1)
+	FishingRewardFxLayer.ZIndex = 85
+	FishingRewardFxLayer.Parent = FishingGui
+	FishingRewardBar = Instance.new("Frame")
+	FishingRewardBar.Name = "FishingRewardBar"
+	FishingRewardBar.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingRewardBar.Position = UDim2.fromScale(0.5, 0.2)
+	FishingRewardBar.Size = UDim2.fromScale(0.34, 0.035)
+	FishingRewardBar.BackgroundColor3 = Color3.fromRGB(19, 28, 35)
+	FishingRewardBar.BackgroundTransparency = 0.15
+	FishingRewardBar.BorderSizePixel = 0
+	FishingRewardBar.Visible = false
+	FishingRewardBar.Parent = FishingRhythmLayer
+
+	local UICorner = Instance.new("UICorner")
+
+	UICorner.CornerRadius = UDim.new(0.5, 0)
+	UICorner.Parent = FishingRewardBar
+
+	local UIStroke2 = Instance.new("UIStroke")
+
+	UIStroke2.Color = Color3.fromRGB(255, 255, 255)
+	UIStroke2.Transparency = 0.25
+	UIStroke2.Thickness = 2
+	UIStroke2.Parent = FishingRewardBar
+
+	local Fill = Instance.new("Frame")
+
+	Fill.Name = "Fill"
+	Fill.Size = UDim2.fromScale(0, 1)
+	Fill.BackgroundColor3 = Color3.fromRGB(75, 230, 125)
+	Fill.BorderSizePixel = 0
+	Fill.Parent = FishingRewardBar
+
+	local UICorner2 = Instance.new("UICorner")
+
+	UICorner2.CornerRadius = UDim.new(0.5, 0)
+	UICorner2.Parent = Fill
+
+	local Label = Instance.new("TextLabel")
+
+	Label.Name = "Label"
+	Label.BackgroundTransparency = 1
+	Label.Size = UDim2.fromScale(1, 1)
+	Label.Text = "0%"
+	Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Label.TextScaled = true
+	Label.Font = Enum.Font.FredokaOne
+	Label.Parent = FishingRewardBar
+
+	local UIStroke3 = Instance.new("UIStroke")
+
+	UIStroke3.Color = Color3.fromRGB(20, 20, 20)
+	UIStroke3.Thickness = 1.5
+	UIStroke3.Parent = Label
+
+	local v43 = false
+	local Scale = Fill.Size.Y.Scale
+	local Offset = Fill.Size.Y.Offset
+	local Scale2 = Fill.Position.Y.Scale
+	local Offset2 = Fill.Position.Y.Offset
+	local BackgroundColor3 = Fill.BackgroundColor3
+	local t3 = {}
+	local t4 = {}
+	local Color = UIStroke2.Color
+	local Transparency = UIStroke2.Transparency
+
+	t5 = {
+		{
+			perfect = 0.105,
+			good = 0.17,
+			meh = 0.26
+		},
+		{
+			perfect = 0.095,
+			good = 0.16,
+			meh = 0.24
+		},
+		{
+			perfect = 0.088,
+			good = 0.145,
+			meh = 0.22
+		},
+		{
+			perfect = 0.08,
+			good = 0.132,
+			meh = 0.205
+		},
+		{
+			perfect = 0.074,
+			good = 0.122,
+			meh = 0.19
+		}
+	}
+
+	local t6 = {
+		Color3.fromRGB(75, 230, 125),
+		Color3.fromRGB(85, 185, 255),
+		Color3.fromRGB(255, 225, 85),
+		Color3.fromRGB(255, 135, 80),
+		Color3.fromRGB(220, 95, 255)
+	}
+	local t7 = {
+		nil,
+		Color3.fromRGB(9, 45, 110),
+		Color3.fromRGB(110, 18, 18),
+		Color3.fromRGB(138, 67, 8),
+		Color3.fromRGB(92, 96, 108)
+	}
+
+	local function findFirstDescendantOfClass(p1, p2) --[[ findFirstDescendantOfClass | Line: 708 ]]
+		for i, v in ipairs(p1:GetDescendants()) do
+			if v:IsA(p2) then
+				return v
+			end
+		end
+
+		return nil
+	end
+
+	local function getStageIndexFromGradientName(p1) --[[ getStageIndexFromGradientName | Line: 717 ]]
+		local v1 = tostring(p1 or ""):match("(%d+)$")
+
+		return if v1 then tonumber(v1) or nil else nil
+	end
+
+	local function cacheRewardStageGradients(p1) --[[ cacheRewardStageGradients | Line: 722 | Upvalues: t4 (copy), t6 (copy) ]]
+		if not p1 then
+			return
+		end
+
+		table.clear(t4)
+
+		local list = {}
+
+		for i, v in ipairs(p1:GetChildren()) do
+			if v:IsA("UIGradient") then
+				table.insert(list, v)
+			end
+		end
+
+		table.sort(list, function(p1, p2) --[[ Line: 733 ]]
+			return p1.Name < p2.Name
+		end)
+
+		for i, v in ipairs(list) do
+			local v1
+			local v3 = tostring(v.Name or ""):match("(%d+)$")
+
+			if v3 then
+				local v4 = tonumber(v3)
+
+				v1 = if v4 then v4 else nil
+			else
+				v1 = nil
+			end
+
+			local v5 = v1 or i
+
+			if v5 >= 1 and v5 <= #t6 then
+				local v6 = v:Clone()
+
+				v6.Enabled = true
+				t4[v5] = v6
+			end
+		end
+	end
+
+	local function findRewardTemplate() --[[ findRewardTemplate | Line: 746 | Upvalues: PlayerGui (copy) ]]
+		local v1 = PlayerGui:FindFirstChild("MainUI") or game.StarterGui:FindFirstChild("MainUI")
+		local v2 = if v1 then v1:FindFirstChild("Frames") else v1
+		local v3 = if v2 then v2:FindFirstChild("Example") else v2
+
+		if v3 and v3:IsA("GuiObject") then
+			return v3
+		end
+
+		return nil
+	end
+
+	local function copyGuiObjectVisual(p1, p2) --[[ copyGuiObjectVisual | Line: 756 ]]
+		p1.Size = p2.Size
+		p1.BackgroundColor3 = p2.BackgroundColor3
+		p1.BackgroundTransparency = p2.BackgroundTransparency
+		p1.BorderSizePixel = p2.BorderSizePixel
+		p1.BorderColor3 = p2.BorderColor3
+		p1.Rotation = p2.Rotation
+		p1.ClipsDescendants = true
+	end
+
+	applyRewardTemplate = function() --[[ applyRewardTemplate | Line: 766 | Upvalues: v43 (ref), findRewardTemplate (copy), FishingRewardBar (copy), scaleFishingStrokes (copy), Fill (ref), Scale (ref), Offset (ref), Scale2 (ref), Offset2 (ref), BackgroundColor3 (ref), cacheRewardStageGradients (copy), findFirstDescendantOfClass (copy), Label (ref), UIStroke2 (ref), Color (ref), Transparency (ref) ]]
+		if v43 then
+			return
+		end
+
+		local v1 = findRewardTemplate()
+
+		if not v1 then
+			return
+		end
+
+		v43 = true
+
+		local Visible = FishingRewardBar.Visible
+
+		for i, v in ipairs(FishingRewardBar:GetChildren()) do
+			v:Destroy()
+		end
+
+		local v2 = FishingRewardBar
+
+		v2.Size = v1.Size
+		v2.BackgroundColor3 = v1.BackgroundColor3
+		v2.BackgroundTransparency = v1.BackgroundTransparency
+		v2.BorderSizePixel = v1.BorderSizePixel
+		v2.BorderColor3 = v1.BorderColor3
+		v2.Rotation = v1.Rotation
+		v2.ClipsDescendants = true
+		FishingRewardBar.Name = "FishingRewardBar"
+		FishingRewardBar.AnchorPoint = Vector2.new(0.5, 0.5)
+		FishingRewardBar.Position = UDim2.fromScale(0.5, 0.84)
+		FishingRewardBar.Visible = Visible
+		scaleFishingStrokes(FishingRewardBar)
+
+		for i, v in ipairs(v1:GetChildren()) do
+			if not (v:IsA("Script") or (v:IsA("LocalScript") or v:IsA("ModuleScript"))) then
+				v:Clone().Parent = FishingRewardBar
+			end
+		end
+
+		local v3 = FishingRewardBar:FindFirstChild("Color", true) or FishingRewardBar:FindFirstChild("Fill", true)
+
+		if v3 and v3:IsA("GuiObject") then
+			Fill = v3
+			v3.Name = "Fill"
+			v3.AnchorPoint = Vector2.new(0, v3.AnchorPoint.Y)
+			v3.Position = UDim2.new(0, 0, v3.Position.Y.Scale, v3.Position.Y.Offset)
+			Scale = v3.Size.Y.Scale
+			Offset = v3.Size.Y.Offset
+			Scale2 = v3.Position.Y.Scale
+			Offset2 = v3.Position.Y.Offset
+			BackgroundColor3 = v3.BackgroundColor3
+			v3.ClipsDescendants = true
+			v3.ZIndex = FishingRewardBar.ZIndex + 1
+		else
+			Fill = Instance.new("Frame")
+			Fill.Name = "Fill"
+			Fill.AnchorPoint = Vector2.new(0, 0.5)
+			Fill.Position = UDim2.fromScale(0, 0.5)
+			Fill.Size = UDim2.fromScale(0, 1)
+			Fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			Fill.BorderSizePixel = 0
+			Fill.ZIndex = FishingRewardBar.ZIndex + 1
+			Fill.Parent = FishingRewardBar
+			Scale = 1
+			Offset = 0
+			Scale2 = 0.5
+			Offset2 = 0
+			BackgroundColor3 = Fill.BackgroundColor3
+		end
+
+		cacheRewardStageGradients(Fill)
+
+		local v4 = FishingRewardBar:FindFirstChild("Title", true) or findFirstDescendantOfClass(FishingRewardBar, "TextLabel")
+
+		if v4 and v4:IsA("TextLabel") then
+			Label = v4
+			v4.Name = "Label"
+			v4.Text = "0%"
+			v4.BackgroundTransparency = 1
+			v4.ZIndex = FishingRewardBar.ZIndex + 2
+		else
+			Label = Instance.new("TextLabel")
+			Label.Name = "Label"
+			Label.BackgroundTransparency = 1
+			Label.Size = UDim2.fromScale(1, 1)
+			Label.Text = "0%"
+			Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+			Label.TextScaled = true
+			Label.Font = Enum.Font.FredokaOne
+			Label.ZIndex = FishingRewardBar.ZIndex + 2
+			Label.Parent = FishingRewardBar
+
+			local UIStroke = Instance.new("UIStroke")
+
+			UIStroke.Color = Color3.fromRGB(20, 20, 20)
+			UIStroke.Thickness = 1.5
+			UIStroke.Parent = Label
+		end
+
+		local UIStroke = FishingRewardBar:FindFirstChildOfClass("UIStroke")
+
+		if not UIStroke then
+			scaleFishingStrokes(FishingRewardBar)
+
+			return
+		end
+
+		UIStroke2 = UIStroke
+		Color = UIStroke.Color
+		Transparency = UIStroke.Transparency
+		scaleFishingStrokes(FishingRewardBar)
+	end
+
+	local function getConfigNumber(p1, p2) --[[ getConfigNumber | Line: 852 | Upvalues: Config (copy) ]]
+		local v1 = Config:FindFirstChild(p1)
+
+		if v1 and v1:IsA("NumberValue") then
+			return tonumber(v1.Value) or p2
+		end
+
+		return p2
+	end
+
+	local function isWaterPart(p1) --[[ isWaterPart | Line: 860 ]]
+		if not (p1 and p1:IsA("BasePart")) then
+			return false
+		end
+
+		if p1:GetAttribute("FishingWater") == true then
+			return true
+		end
+
+		if p1.Material == Enum.Material.Water then
+			return true
+		end
+
+		return string.find(string.lower(p1.Name), "water", 1, true) ~= nil
+	end
+
+	local function getDirectWaterHit(p1, p2) --[[ getDirectWaterHit | Line: 873 | Upvalues: Workspace (copy), isWaterPart (copy), v5 (ref) ]]
+		if not p1 then
+			return nil
+		end
+
+		local t = {}
+
+		if p2 then
+			table.insert(t, p2)
+		end
+
+		local FishingRuntime = Workspace:FindFirstChild("FishingRuntime")
+
+		if FishingRuntime then
+			table.insert(t, FishingRuntime)
+		end
+
+		local v1 = RaycastParams.new()
+
+		v1.FilterType = Enum.RaycastFilterType.Exclude
+		v1.IgnoreWater = true
+		v1.FilterDescendantsInstances = t
+
+		local v2 = Workspace:Raycast(p1.Position + Vector3.new(0, 3, 0), Vector3.new(0, -17, 0), v1)
+
+		if not (v2 and isWaterPart(v2.Instance)) then
+			return nil
+		end
+
+		local Position = p1.Position
+		local v3
+
+		if Position and v5 then
+			local v4, v52 = v5()
+
+			if v4 and v52 then
+				local Magnitude = Vector3.new(Position.X - v4.X, 0, Position.Z - v4.Z).Magnitude
+
+				v3 = if v52 - 42 <= Magnitude then if Magnitude <= v52 + 80 then true else false else false
+			else
+				v3 = true
+			end
+		else
+			v3 = true
+		end
+
+		if v3 then
+			return v2
+		end
+
+		return nil
+	end
+
+	local t8 = {
+		Vector3.new(0, 0, 0),
+		Vector3.new(1, 0, 0),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(0, 0, 1),
+		Vector3.new(0, 0, -1),
+		Vector3.new(0.707, 0, 0.707),
+		Vector3.new(-0.707, 0, 0.707),
+		Vector3.new(0.707, 0, -0.707),
+		Vector3.new(-0.707, 0, -0.707)
+	}
+	local t9 = { 0, 6, 10, 14, 18, 22, 26, 30 }
+
+	local function markWaterPartsDirty() --[[ markWaterPartsDirty | Line: 914 | Upvalues: v11 (ref), v12 (ref) ]]
+		v11 = true
+		v12 = v12 + 1
+	end
+
+	Workspace.DescendantAdded:Connect(function(p1) --[[ Line: 919 | Upvalues: isWaterPart (copy), v11 (ref), v12 (ref) ]]
+		if not isWaterPart(p1) then
+			return
+		end
+
+		v11 = true
+		v12 = v12 + 1
+	end)
+	Workspace.DescendantRemoving:Connect(function(p1) --[[ Line: 924 | Upvalues: isWaterPart (copy), v11 (ref), v12 (ref) ]]
+		if not isWaterPart(p1) then
+			return
+		end
+
+		v11 = true
+		v12 = v12 + 1
+	end)
+	refreshWaterParts = function(p1) --[[ refreshWaterParts | Line: 930 | Upvalues: v11 (ref), v10 (ref), t (copy), Workspace (copy), isWaterPart (copy) ]]
+		local v1 = os.clock()
+
+		if not p1 and (not v11 and v1 - v10 < 30) then
+			return
+		end
+
+		v10 = v1
+		v11 = false
+		table.clear(t)
+
+		for i, v in ipairs(Workspace:GetDescendants()) do
+			if isWaterPart(v) then
+				table.insert(t, v)
+			end
+		end
+	end
+
+	local function surfacePointOnPart(p1, p2) --[[ surfacePointOnPart | Line: 945 ]]
+		local v1 = p1.CFrame:PointToObjectSpace(p2)
+		local v2 = p1.Size * 0.5
+
+		return p1.CFrame:PointToWorldSpace((Vector3.new(math.clamp(v1.X, -v2.X, v2.X), v2.Y, (math.clamp(v1.Z, -v2.Z, v2.Z)))))
+	end
+
+	v5 = function() --[[ Line: 955 | Upvalues: v4 (ref), Workspace (copy) ]]
+		if v4 and v4.Parent then
+			return v4.Position, math.max(v4.Size.X, v4.Size.Y, v4.Size.Z) * 0.5
+		end
+
+		local yea2 = Workspace:FindFirstChild("yea2")
+		local v2 = nil
+		local v3 = 0
+
+		if yea2 then
+			for i, v in ipairs(yea2:GetDescendants()) do
+				if v:IsA("MeshPart") and v.MeshId == "rbxassetid://752309737" then
+					local v42 = math.max(v.Size.X, v.Size.Y, v.Size.Z)
+
+					if v3 < v42 then
+						v3 = v42
+						v2 = v
+					end
+				end
+			end
+		end
+
+		v4 = v2
+
+		if v2 then
+			return v2.Position, v3 * 0.5
+		end
+
+		return nil, nil
+	end
+
+	local function getShoreFishingWater(p1) --[[ getShoreFishingWater | Line: 982 | Upvalues: v5 (ref), t (copy), surfacePointOnPart (copy), v3 (ref), Config (copy) ]]
+		local v1, v2 = v5()
+
+		if not (v1 and v2) then
+			return nil, nil
+		end
+
+		local v52 = Vector3.new(p1.X - v1.X, 0, p1.Z - v1.Z)
+		local Magnitude = v52.Magnitude
+
+		if Magnitude < v2 - 42 or v2 + 80 < Magnitude then
+			return nil, nil
+		end
+
+		local v6 = if Magnitude > 0.01 then v52.Unit or Vector3.new(0, 0, -1) else Vector3.new(0, 0, -1)
+		local v7 = v1 + v6 * math.max(Magnitude + 14, v2 + 16)
+		local v8 = Vector3.new(v7.X, p1.Y, v7.Z)
+		local v9 = (1 / 0)
+		local v10 = nil
+		local v11 = nil
+
+		for i, v in ipairs(t) do
+			if v.Parent then
+				local v12 = surfacePointOnPart(v, v8)
+				local v14 = math.abs(p1.Y - v12.Y)
+
+				if v14 <= 16 and v14 < v9 then
+					v9 = v14
+					v10 = v12
+					v11 = v
+				end
+			end
+		end
+
+		if v10 then
+			local NearWaterDistance = Config:FindFirstChild("NearWaterDistance")
+			local v18 = math.min(NearWaterDistance and NearWaterDistance:IsA("NumberValue") and tonumber(NearWaterDistance.Value) or v3, 30)
+
+			if v18 < Vector3.new(p1.X - v10.X, 0, p1.Z - v10.Z).Magnitude then
+				return nil, nil
+			end
+		end
+
+		return v11, v10
+	end
+
+	local function horizontalDistance(p1, p2) --[[ horizontalDistance | Line: 1022 ]]
+		local v1 = Vector3.new(p1.X, 0, p1.Z)
+
+		return (v1 - Vector3.new(p2.X, 0, p2.Z)).Magnitude
+	end
+
+	local function flatForward(p1) --[[ flatForward | Line: 1029 ]]
+		local v1 = Vector3.new(p1.CFrame.LookVector.X, 0, p1.CFrame.LookVector.Z)
+
+		if v1.Magnitude > 0.01 then
+			return v1.Unit
+		end
+
+		return Vector3.new(0, 0, -1)
+	end
+
+	local function buildIgnoreParams(p1, p2) --[[ buildIgnoreParams | Line: 1037 | Upvalues: Workspace (copy), t (copy) ]]
+		local v1 = RaycastParams.new()
+
+		v1.FilterType = Enum.RaycastFilterType.Exclude
+		v1.IgnoreWater = true
+
+		local t2 = {}
+
+		if p1 then
+			table.insert(t2, p1)
+		end
+
+		local FishingRuntime = Workspace:FindFirstChild("FishingRuntime")
+
+		if FishingRuntime then
+			table.insert(t2, FishingRuntime)
+		end
+
+		for i, v in ipairs(t) do
+			if v and v.Parent then
+				table.insert(t2, v)
+			end
+		end
+
+		if p2 then
+			for i, v in ipairs(p2) do
+				if v then
+					table.insert(t2, v)
+				end
+			end
+		end
+
+		v1.FilterDescendantsInstances = t2
+
+		return v1
+	end
+
+	local function segmentIsClear(p1, p2, p3, p4) --[[ segmentIsClear | Line: 1065 | Upvalues: Workspace (copy), buildIgnoreParams (copy) ]]
+		local v1 = p2 - p1
+
+		if v1.Magnitude <= 0.05 then
+			return true
+		end
+
+		return Workspace:Raycast(p1, v1, (buildIgnoreParams(p3, p4))) == nil
+	end
+
+	local function castPathIsClear(p1, p2, p3, p4, p5) --[[ castPathIsClear | Line: 1073 | Upvalues: Workspace (copy), buildIgnoreParams (copy) ]]
+		local v4 = Vector3.new(p3 and p3.X or 0, 0, p3 and p3.Z or 0)
+		local v5 = if v4.Magnitude > 0.01 then v4.Unit else Vector3.new(0, 0, -1)
+		local v6 = Vector3.new(p1.X, 0, p1.Z)
+		local v8 = math.clamp((v6 - Vector3.new(p2.X, 0, p2.Z)).Magnitude * 0.62, 8, 16)
+		local v9 = p1:Lerp(p2, 0.48) + Vector3.new(0, v8, 0) + v5 * 4.5
+		local v10 = p1
+
+		for i = 1, 8 do
+			local v11 = i / 8
+			local v12 = 1 - (1 - v11) * (1 - v11)
+			local v13 = 1 - v12
+			local v14 = p1 * (v13 * v13) + v9 * (v13 * 2 * v12) + p2 * (v12 * v12)
+			local v15 = v14 - v10
+
+			if not (if v15.Magnitude <= 0.05 then true elseif Workspace:Raycast(v10, v15, (buildIgnoreParams(p4, p5))) == nil then true else false) then
+				return false
+			end
+
+			local v17 = v14 - p1
+
+			if not (if v17.Magnitude <= 0.05 then true elseif Workspace:Raycast(p1, v17, (buildIgnoreParams(p4, p5))) == nil then true else false) then
+				return false
+			end
+
+			v10 = v14
+		end
+
+		return true
+	end
+
+	local function getCharacterRoot() --[[ getCharacterRoot | Line: 1096 | Upvalues: LocalPlayer (copy) ]]
+		local Character = LocalPlayer.Character
+
+		return if Character then Character:FindFirstChild("HumanoidRootPart") else Character
+	end
+
+	local function getCharacterHand(p1) --[[ getCharacterHand | Line: 1101 ]]
+		return if p1 then p1:FindFirstChild("RightHand") or (p1:FindFirstChild("Right Arm") or p1:FindFirstChild("RightLowerArm")) else p1
+	end
+
+	local function getRodGeometry(p1, p2, p3) --[[ getRodGeometry | Line: 1105 | Upvalues: Workspace (copy), buildIgnoreParams (copy) ]]
+		if not (p1 and p2) then
+			return nil, nil
+		end
+
+		local v1 = Vector3.new(p2.CFrame.LookVector.X, 0, p2.CFrame.LookVector.Z)
+		local v2 = if v1.Magnitude > 0.01 then v1.Unit else Vector3.new(0, 0, -1)
+		local Unit = (v2 * 0.38 + Vector3.new(0, 0.93, 0)).Unit
+		local v3 = p1.Position + Vector3.new(0, 0.08, 0) + v2 * 0.12
+		local v4 = Workspace:Raycast(v3 + Unit * 0.12, Unit * 5.68, (buildIgnoreParams(p3)))
+		local v5
+
+		if v4 then
+			v5 = v4.Distance + 0.12 - 0.25
+
+			if v5 < 2.4 then
+				return nil, nil
+			end
+		else
+			v5 = 5.8
+		end
+
+		return v3, v3 + Unit * v5
+	end
+
+	local function isExposedWaterPoint(p1, p2, p3, p4) --[[ isExposedWaterPoint | Line: 1124 | Upvalues: Workspace (copy), isWaterPart (copy) ]]
+		local v1 = RaycastParams.new()
+
+		v1.FilterType = Enum.RaycastFilterType.Exclude
+		v1.IgnoreWater = true
+
+		local t = {}
+
+		if p3 then
+			table.insert(t, p3)
+		end
+
+		local FishingRuntime = Workspace:FindFirstChild("FishingRuntime")
+
+		if FishingRuntime then
+			table.insert(t, FishingRuntime)
+		end
+
+		v1.FilterDescendantsInstances = t
+
+		local v7 = Workspace:Raycast(Vector3.new(p2.X, math.max((p4 and p4.Y or p2.Y) + 80, p2.Y + 80), p2.Z), Vector3.new(0, -160, 0), v1)
+
+		if not (v7 and isWaterPart(v7.Instance)) then
+			return false
+		end
+
+		return math.abs(v7.Position.Y - p2.Y) <= 2.5
+	end
+
+	isNearWater = function() --[[ isNearWater | Line: 1146 | Upvalues: LocalPlayer (copy), isPositionInTower (copy), v13 (ref), v14 (ref), v15 (ref), v16 (ref), v17 (ref), getRodGeometry (copy), v3 (ref), Config (copy), refreshWaterParts (copy), getDirectWaterHit (copy), v12 (ref), Workspace (copy), getShoreFishingWater (copy), buildIgnoreParams (copy), castPathIsClear (copy), t (copy), t9 (copy), t8 (copy), surfacePointOnPart (copy), isExposedWaterPoint (copy) ]]
+		local Character = LocalPlayer.Character
+		local Character2 = LocalPlayer.Character
+		local v1 = Character2 and Character2:FindFirstChild("HumanoidRootPart")
+		local v2 = if Character then Character:FindFirstChild("RightHand") or (Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightLowerArm")) else Character
+
+		if not (Character and (v1 and v2)) then
+			return false
+		end
+
+		if isPositionInTower(v1.Position) then
+			v13 = 0
+			v14 = nil
+			v15 = nil
+			v16 = -1
+			v17 = false
+
+			return false
+		end
+
+		local _, v32 = getRodGeometry(v2, v1, Character)
+
+		if not v32 then
+			return false
+		end
+
+		local NearWaterDistance = Config:FindFirstChild("NearWaterDistance")
+
+		v3 = math.min(NearWaterDistance and NearWaterDistance:IsA("NumberValue") and tonumber(NearWaterDistance.Value) or v3, 30)
+		refreshWaterParts(false)
+
+		if getDirectWaterHit(v1, Character) then
+			v13 = os.clock()
+			v14 = v1.Position
+			v15 = nil
+			v16 = v12
+			v17 = true
+
+			return true
+		end
+
+		local LookVector = v1.CFrame.LookVector
+		local CurrentCamera = Workspace.CurrentCamera
+
+		if CurrentCamera then
+			LookVector = CurrentCamera.CFrame.LookVector
+		end
+
+		local v7 = Vector3.new(LookVector.X, 0, LookVector.Z)
+		local v8 = if v7.Magnitude > 0.01 then v7.Unit else nil
+
+		if v14 and (v16 == v12 and os.clock() - v13 <= 0.45) and ((v1.Position - v14).Magnitude <= 1.35 and (not (v8 and v15) or (if v8:Dot(v15) >= 0.985 then true else false))) then
+			return v17
+		end
+
+		local v10, v11 = getShoreFishingWater(v1.Position)
+
+		if v10 and v11 then
+			local v122 = v11 + Vector3.new(0, 0.45, 0)
+			local v132 = v122 - v32
+			local v142 = if v132.Magnitude <= 0.05 then true elseif Workspace:Raycast(v32, v132, (buildIgnoreParams(Character, { v10 }))) == nil then true else false
+
+			if v142 and castPathIsClear(v32, v122, v1.CFrame.LookVector, Character, { v10 }) then
+				v13 = os.clock()
+				v14 = v1.Position
+				v15 = v8
+				v16 = v12
+				v17 = true
+
+				return true
+			end
+		end
+
+		local v162 = math.min(v3, 9)
+		local v172 = (1 / 0)
+
+		for i, v in ipairs(t) do
+			if v.Parent then
+				for i2, v6 in ipairs(t9) do
+					for i3, v9 in ipairs(t8) do
+						local v18 = surfacePointOnPart(v, v1.Position + v9 * v6)
+						local Position = v1.Position
+						local v19 = Vector3.new(Position.X, 0, Position.Z)
+						local Magnitude = (v19 - Vector3.new(v18.X, 0, v18.Z)).Magnitude
+						local v21 = math.abs(v1.Position.Y - v18.Y)
+
+						if Magnitude <= v3 and (v21 <= 24 and isExposedWaterPoint(v, v18, Character, v1.Position)) then
+							local v22 = v18 + Vector3.new(0, 0.45, 0)
+							local v23 = v22 - v32
+							local v24 = if v23.Magnitude <= 0.05 then true elseif Workspace:Raycast(v32, v23, (buildIgnoreParams(Character, { v }))) == nil then true else false
+
+							if v24 and castPathIsClear(v32, v22, LookVector, Character, { v }) then
+								local sum = math.abs(Magnitude - v162) * 1.15 + v21 * 0.15
+
+								if v8 then
+									local v27 = Vector3.new(v18.X - v1.Position.X, 0, v18.Z - v1.Position.Z)
+
+									if v27.Magnitude > 0.01 then
+										local v28 = v27.Unit:Dot(v8)
+
+										sum = sum - math.max(0, v28) * 14
+
+										if v28 < -0.15 then
+											sum = sum + 30
+										end
+									end
+								end
+
+								v172 = math.min(v172, sum)
+							end
+						end
+					end
+				end
+			end
+		end
+
+		local v30 = v172 < (1 / 0)
+
+		if not v30 then
+			for i, v in ipairs(t) do
+				if v.Parent then
+					for i2, v6 in ipairs(t9) do
+						for i3, v9 in ipairs(t8) do
+							local v31 = surfacePointOnPart(v, v1.Position + v9 * v6)
+							local Position = v1.Position
+							local v322 = Vector3.new(Position.X, 0, Position.Z)
+							local Magnitude = (v322 - Vector3.new(v31.X, 0, v31.Z)).Magnitude
+
+							if Magnitude <= v3 and (math.abs(v1.Position.Y - v31.Y) <= 24 and isExposedWaterPoint(v, v31, Character, v1.Position)) then
+								v30 = true
+
+								break
+							end
+						end
+
+						if v30 then
+							break
+						end
+					end
+
+					if v30 then
+						break
+					end
+				end
+			end
+		end
+
+		v13 = os.clock()
+		v14 = v1.Position
+		v15 = v8
+		v16 = v12
+		v17 = v30
+
+		return v30
+	end
+	v44 = false
+
+	local function isBlockingMainFrameOpen() --[[ isBlockingMainFrameOpen | Line: 1274 | Upvalues: PlayerGui (copy), v29 (ref) ]]
+		local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+		if MainUI then
+			v29 = MainUI
+		end
+
+		local v1 = v29
+
+		if v1 then
+			if v1:GetAttribute("SkillTreeOpen") == true or (v1:GetAttribute("DailiesOpen") == true or v1:GetAttribute("RollRevealHudHidden") == true) then
+				return true
+			end
+
+			local Hexagonal = v1:FindFirstChild("Hexagonal")
+
+			if Hexagonal and (Hexagonal:IsA("GuiObject") and Hexagonal.Visible) then
+				return true
+			end
+
+			local Frames = v1:FindFirstChild("Frames")
+
+			if Frames then
+				for i, v in ipairs(Frames:GetChildren()) do
+					if v:IsA("GuiObject") and (v.Visible and v.Name ~= "Fish") then
+						return true
+					end
+				end
+			end
+		end
+
+		local Main = PlayerGui:FindFirstChild("Main")
+
+		if not Main then
+			return false
+		end
+
+		for i, v in ipairs({ "Shop", "AutoDelete" }) do
+			local v2 = Main:FindFirstChild(v)
+
+			if v2 and (v2:IsA("GuiObject") and v2.Visible) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	showPrompt = function(p1) --[[ showPrompt | Line: 1305 | Upvalues: LocalPlayer (copy), isPositionInTower (copy), v13 (ref), v14 (ref), v15 (ref), v16 (ref), v17 (ref), isBlockingMainFrameOpen (copy), getRollDiceTopScale (copy), v6 (ref), v7 (ref), v8 (ref), v28 (ref), v9 (ref), refreshFishingButtonLayout (copy), FishButton (copy), getFishingButtonPosition (copy), v38 (ref), v37 (ref), v34 (copy), TweenService (copy) ]]
+		if p1 then
+			local Character = LocalPlayer.Character
+			local v1 = Character and Character:FindFirstChild("HumanoidRootPart")
+
+			if v1 and isPositionInTower(v1.Position) then
+				v13 = 0
+				v14 = nil
+				v15 = nil
+				v16 = -1
+				v17 = false
+				p1 = false
+			end
+		end
+
+		if p1 and isBlockingMainFrameOpen() then
+			p1 = false
+		end
+
+		if p1 then
+			getRollDiceTopScale()
+		end
+
+		if v6 or (v7 or (not v8 or os.clock() < v28)) then
+			p1 = false
+		end
+
+		if p1 or v9 then
+			refreshFishingButtonLayout()
+		end
+
+		if v9 == p1 then
+			if not p1 then
+				return
+			end
+
+			FishButton.Visible = true
+
+			local v2 = getFishingButtonPosition(FishButton.Size)
+
+			v38 = v2
+			v37 = v2
+			FishButton.Position = v2
+
+			if not (v34.Scale < 0.98) then
+				return
+			end
+
+			v34.Scale = 1
+		else
+			v9 = p1
+
+			if p1 then
+				FishButton.Visible = true
+				v34.Scale = 0
+
+				local v3 = getFishingButtonPosition(FishButton.Size)
+
+				v38 = v3
+				v37 = v3
+				FishButton.Position = v3
+				TweenService:Create(FishButton, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+					Position = v3
+				}):Play()
+				TweenService:Create(v34, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+					Scale = 1
+				}):Play()
+			else
+				v38 = nil
+				TweenService:Create(v34, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					Scale = 0
+				}):Play()
+				task.delay(0.13, function() --[[ Line: 1352 | Upvalues: v9 (ref), FishButton (ref) ]]
+					if v9 then
+						return
+					end
+
+					FishButton.Visible = false
+				end)
+			end
+		end
+	end
+	showCancelButton = function(p1) --[[ showCancelButton | Line: 1360 | Upvalues: v44 (ref), refreshFishingButtonLayout (copy), FishingCancelButton (copy), v35 (copy), v38 (ref), v37 (ref), v36 (ref), getFishingButtonPosition (copy), TweenService (copy) ]]
+		if p1 or v44 then
+			refreshFishingButtonLayout()
+		end
+
+		if v44 == p1 then
+			return
+		end
+
+		v44 = p1
+
+		if p1 then
+			FishingCancelButton.Visible = true
+			v35.Scale = 0
+
+			local v1 = v38 or v37 or v36 or getFishingButtonPosition(FishingCancelButton.Size)
+
+			v37 = v1
+			FishingCancelButton.Position = v1
+			TweenService:Create(FishingCancelButton, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Position = v1
+			}):Play()
+			TweenService:Create(v35, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Scale = 1
+			}):Play()
+		else
+			local v2 = FishingCancelButton
+
+			v2.Position = v37 or FishingCancelButton.Position
+			TweenService:Create(v35, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+				Scale = 0
+			}):Play()
+			task.delay(0.13, function() --[[ Line: 1380 | Upvalues: v44 (ref), FishingCancelButton (ref) ]]
+				if v44 then
+					return
+				end
+
+				FishingCancelButton.Visible = false
+			end)
+		end
+	end
+
+	local function showStatus(p1, p2, p3) --[[ showStatus | Line: 1388 | Upvalues: v24 (ref), FishingStatus (copy), UIStroke (copy) ]]
+		if not v24 then
+			FishingStatus.Text = ""
+			FishingStatus.Visible = false
+			FishingStatus.TextTransparency = 1
+			UIStroke.Transparency = 1
+
+			return
+		end
+
+		v24:Cancel()
+		v24 = nil
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+	end
+
+	local t10 = {
+		hidden = false,
+		hiddenSince = nil,
+		previousRollHidden = nil,
+		previousFishingActive = nil,
+		previousRollSoundsVolume = nil,
+		rollSoundsSuppressed = false,
+		transitionToken = 0,
+		originals = {},
+		tweens = {}
+	}
+
+	local function getFishingRollSoundGroup() --[[ getFishingRollSoundGroup | Line: 1411 | Upvalues: SoundService (copy) ]]
+		local RollSounds = SoundService:FindFirstChild("RollSounds")
+
+		if RollSounds and RollSounds:IsA("SoundGroup") then
+			return RollSounds
+		end
+
+		local RollSounds2 = Instance.new("SoundGroup")
+
+		RollSounds2.Name = "RollSounds"
+		RollSounds2.Parent = SoundService
+
+		return RollSounds2
+	end
+
+	local function setFishingRollSoundsSuppressed(p1) --[[ setFishingRollSoundsSuppressed | Line: 1422 | Upvalues: SoundService (copy), t10 (copy) ]]
+		local RollSounds = SoundService:FindFirstChild("RollSounds")
+		local v1
+
+		if RollSounds and RollSounds:IsA("SoundGroup") then
+			v1 = RollSounds
+		else
+			local RollSounds2 = Instance.new("SoundGroup")
+
+			RollSounds2.Name = "RollSounds"
+			RollSounds2.Parent = SoundService
+			v1 = RollSounds2
+		end
+
+		if p1 then
+			if t10.rollSoundsSuppressed and (if t10.rollSoundGroup == v1 then true else false) then
+				if v1.Volume ~= 0 then
+					v1.Volume = 0
+				end
+			else
+				t10.previousRollSoundsVolume = v1.Volume
+				t10.rollSoundsSuppressed = true
+				t10.rollSoundGroup = v1
+
+				if v1.Volume ~= 0 then
+					v1.Volume = 0
+				end
+
+				for i, v in ipairs(SoundService:GetDescendants()) do
+					if v:IsA("Sound") and (v.SoundGroup == v1 and v.IsPlaying) then
+						v:Stop()
+					end
+				end
+			end
+		else
+			if not t10.rollSoundsSuppressed then
+				return
+			end
+
+			local rollSoundGroup = t10.rollSoundGroup
+
+			if rollSoundGroup and rollSoundGroup.Parent then
+				rollSoundGroup.Volume = if t10.previousRollSoundsVolume == nil then 1 else t10.previousRollSoundsVolume or 1
+			end
+
+			t10.previousRollSoundsVolume = nil
+			t10.rollSoundsSuppressed = false
+			t10.rollSoundGroup = nil
+		end
+	end
+
+	local function getGuiChild(p1, p2) --[[ getGuiChild | Line: 1452 ]]
+		local v1 = if p1 then p1:FindFirstChild(p2) else p1
+
+		if v1 and v1:IsA("GuiObject") then
+			return v1
+		end
+
+		return nil
+	end
+
+	local function getFishingHudSpecs() --[[ getFishingHudSpecs | Line: 1460 | Upvalues: PlayerGui (copy), v29 (ref) ]]
+		local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+		if MainUI then
+			v29 = MainUI
+		end
+
+		local v1 = v29
+		local t = {}
+
+		local function add(p1, p2, p3, p4) --[[ add | Line: 1463 | Upvalues: t (copy) ]]
+			if not (p1 and p1:IsA("GuiObject")) then
+				return
+			end
+
+			table.insert(t, {
+				hardHide = false,
+				guiObject = p1,
+				x = p2,
+				y = p3
+			})
+		end
+
+		local Main = PlayerGui:FindFirstChild("Main")
+		local v2
+
+		if Main then
+			local v3 = if Main then Main:FindFirstChild("RollButton") else Main
+
+			v2 = if v3 and v3:IsA("GuiObject") then v3 else nil
+		else
+			v2 = Main
+		end
+
+		if v2 and v2:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0,
+				y = 1.35,
+				hardHide = false,
+				guiObject = v2
+			})
+		end
+
+		if Main then
+			for i, v in ipairs({ "ShopButton", "InventoryButton", "EasterRollButton", "AutoRollButton", "AutoEasterRoll", "AutoDeleteButton", "RollFrame", "ActivePotions" }) do
+				local v4
+				local v5 = if Main then Main:FindFirstChild(v) else Main
+
+				v4 = if v5 and v5:IsA("GuiObject") then v5 else nil
+
+				if v4 and v4:IsA("GuiObject") then
+					table.insert(t, {
+						x = 0,
+						y = 1.35,
+						hardHide = false,
+						guiObject = v4
+					})
+				end
+			end
+		end
+
+		local v6 = if v1 then v1:FindFirstChild("Button") else v1
+		local v7 = if v6 and v6:IsA("GuiObject") then v6 else nil
+
+		if v7 and v7:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0,
+				y = 1.35,
+				hardHide = false,
+				guiObject = v7
+			})
+		end
+
+		local v8 = if v1 then v1:FindFirstChild("Buttons") else v1
+		local v9 = if v8 and v8:IsA("GuiObject") then v8 else nil
+
+		if v9 and v9:IsA("GuiObject") then
+			table.insert(t, {
+				x = -0.55,
+				y = 0,
+				hardHide = false,
+				guiObject = v9
+			})
+		end
+
+		local v10 = if v1 then v1:FindFirstChild("LeftBottom") else v1
+		local v11 = if v10 and v10:IsA("GuiObject") then v10 else nil
+
+		if v11 and v11:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0.55,
+				y = 0,
+				hardHide = false,
+				guiObject = v11
+			})
+		end
+
+		local v12 = if v1 then v1:FindFirstChild("LeftBottom2") else v1
+		local v13 = if v12 and v12:IsA("GuiObject") then v12 else nil
+
+		if v13 and v13:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0.55,
+				y = 0,
+				hardHide = false,
+				guiObject = v13
+			})
+		end
+
+		local v14 = if v1 then v1:FindFirstChild("Friend") else v1
+		local v15 = if v14 and v14:IsA("GuiObject") then v14 else nil
+
+		if v15 and v15:IsA("GuiObject") then
+			table.insert(t, {
+				x = -0.55,
+				y = 0,
+				hardHide = false,
+				guiObject = v15
+			})
+		end
+
+		local v16 = if v1 then v1:FindFirstChild("Pets") else v1
+		local v17 = if v16 and v16:IsA("GuiObject") then v16 else nil
+
+		if v17 and v17:IsA("GuiObject") then
+			table.insert(t, {
+				x = -0.35,
+				y = 1.15,
+				hardHide = false,
+				guiObject = v17
+			})
+		end
+
+		local v18 = if v1 then v1:FindFirstChild("Upgrades") else v1
+		local v19 = if v18 and v18:IsA("GuiObject") then v18 else nil
+
+		if v19 and v19:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0.62,
+				y = 0,
+				hardHide = false,
+				guiObject = v19
+			})
+		end
+
+		local v20 = if v1 then v1:FindFirstChild("StarterPackHolder") else v1
+		local v21 = if v20 and v20:IsA("GuiObject") then v20 else nil
+
+		if v21 and v21:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0.62,
+				y = 0,
+				hardHide = false,
+				guiObject = v21
+			})
+		end
+
+		local v22 = if v1 then v1:FindFirstChild("UpgradeButton") else v1
+		local v23 = if v22 and v22:IsA("GuiObject") then v22 else nil
+
+		if v23 and v23:IsA("GuiObject") then
+			table.insert(t, {
+				x = 0,
+				y = 1.35,
+				hardHide = false,
+				guiObject = v23
+			})
+		end
+
+		return t
+	end
+
+	setFishingHudHidden = function(p1) --[[ setFishingHudHidden | Line: 1488 | Upvalues: PlayerGui (copy), v29 (ref), t10 (copy), setFishingRollSoundsSuppressed (copy), getFishingHudSpecs (copy), TweenService (copy) ]]
+		local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+		if MainUI then
+			v29 = MainUI
+		end
+
+		local v1 = v29
+
+		if t10.hidden == p1 then
+			setFishingRollSoundsSuppressed(p1)
+
+			if not (p1 and v1) then
+				return
+			end
+
+			if v1:GetAttribute("FishingActive") ~= true then
+				v1:SetAttribute("FishingActive", true)
+			end
+
+			if v1:GetAttribute("RollRevealHudHidden") ~= true then
+				v1:SetAttribute("RollRevealHudHidden", true)
+			end
+
+			if v1:GetAttribute("FishingHudHidden") ~= true then
+				v1:SetAttribute("FishingHudHidden", true)
+			end
+
+			local v2 = if t10.hiddenSince == nil then false else os.clock() - t10.hiddenSince >= 0.83
+
+			for i, v in ipairs((getFishingHudSpecs())) do
+				local guiObject = v.guiObject
+				local v3 = guiObject and t10.originals[guiObject]
+
+				if guiObject and (v3 and v3.visible) then
+					local v4 = v.hardHide and v2
+					local v5 = not v4
+
+					if guiObject.Visible ~= v5 then
+						guiObject.Visible = v5
+					end
+
+					if not v4 then
+						local v6 = UDim2.new(v3.position.X.Scale + v.x, v3.position.X.Offset, v3.position.Y.Scale + v.y, v3.position.Y.Offset)
+
+						if guiObject.Position ~= v6 then
+							guiObject.Position = v6
+						end
+					end
+
+					local DiceStatus = guiObject:FindFirstChild("DiceStatus")
+
+					if DiceStatus and (DiceStatus:IsA("GuiObject") and DiceStatus.Visible ~= v5) then
+						DiceStatus.Visible = v5
+					end
+				end
+			end
+		else
+			t10.hidden = p1
+
+			local v7 = t10
+
+			v7.transitionToken = v7.transitionToken + 1
+
+			local transitionToken = t10.transitionToken
+
+			setFishingRollSoundsSuppressed(p1)
+
+			if v1 and p1 then
+				t10.previousRollHidden = v1:GetAttribute("RollRevealHudHidden")
+				t10.previousFishingActive = v1:GetAttribute("FishingActive")
+
+				if v1:GetAttribute("FishingHudHidden") ~= true then
+					v1:SetAttribute("FishingHudHidden", true)
+				end
+
+				if v1:GetAttribute("FishingActive") ~= true then
+					v1:SetAttribute("FishingActive", true)
+				end
+
+				if v1:GetAttribute("RollRevealHudHidden") ~= true then
+					v1:SetAttribute("RollRevealHudHidden", true)
+				end
+			elseif v1 then
+				if v1:GetAttribute("FishingHudHidden") ~= true then
+					v1:SetAttribute("FishingHudHidden", true)
+				end
+
+				local v8 = if t10.previousFishingActive == true then true else false
+
+				if v1:GetAttribute("FishingActive") ~= v8 then
+					v1:SetAttribute("FishingActive", v8)
+				end
+
+				t10.previousFishingActive = nil
+			end
+
+			for k, v in pairs(t10.tweens) do
+				v:Cancel()
+			end
+
+			table.clear(t10.tweens)
+
+			if p1 then
+				t10.hiddenSince = os.clock()
+				table.clear(t10.originals)
+			else
+				t10.hiddenSince = nil
+			end
+
+			for i, v in ipairs((getFishingHudSpecs())) do
+				local guiObject = v.guiObject
+
+				if p1 then
+					t10.originals[guiObject] = {
+						position = guiObject.Position,
+						visible = guiObject.Visible
+					}
+				end
+
+				local v9 = t10.originals[guiObject]
+
+				if v9 and (v9.visible or not p1) then
+					if not p1 and v9.visible then
+						guiObject.Visible = true
+					end
+
+					local position = v9.position
+
+					if p1 then
+						position = UDim2.new(v9.position.X.Scale + v.x, v9.position.X.Offset, v9.position.Y.Scale + v.y, v9.position.Y.Offset)
+					end
+
+					local v11 = TweenService:Create(guiObject, TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Position = position
+					})
+
+					t10.tweens[guiObject] = v11
+					v11:Play()
+
+					if not p1 then
+						task.delay(0.78, function() --[[ Line: 1586 | Upvalues: t10 (ref), v9 (copy), guiObject (copy) ]]
+							if t10.hidden or not v9 then
+								return
+							end
+
+							guiObject.Visible = v9.visible
+						end)
+					end
+				end
+			end
+
+			if p1 or not v1 then
+				return
+			end
+
+			task.delay(0.83, function() --[[ Line: 1595 | Upvalues: PlayerGui (ref), v29 (ref), t10 (ref), transitionToken (copy) ]]
+				local MainUI = PlayerGui:FindFirstChild("MainUI")
+
+				if MainUI then
+					v29 = MainUI
+				end
+
+				local v1 = v29
+
+				if t10.transitionToken ~= transitionToken or (t10.hidden or not v1) then
+					return
+				end
+
+				if v1:GetAttribute("FishingHudHidden") ~= false then
+					v1:SetAttribute("FishingHudHidden", false)
+				end
+
+				local v2 = if t10.previousRollHidden == true then true else false
+
+				if v1:GetAttribute("RollRevealHudHidden") == v2 then
+					return
+				end
+
+				v1:SetAttribute("RollRevealHudHidden", v2)
+			end)
+		end
+	end
+
+	local function getFishingSfxGroup() --[[ getFishingSfxGroup | Line: 1610 | Upvalues: SoundService (copy) ]]
+		local SFX = SoundService:FindFirstChild("SFX")
+
+		if SFX and SFX:IsA("SoundGroup") then
+			return SFX
+		end
+
+		local SFX2 = Instance.new("SoundGroup")
+
+		SFX2.Name = "SFX"
+		SFX2.Parent = SoundService
+
+		return SFX2
+	end
+
+	playFishingSound = function(p1, p2) --[[ playFishingSound | Line: 1621 | Upvalues: SoundService (copy), Debris (copy) ]]
+		local v1 = SoundService:FindFirstChild(p1)
+
+		if not (v1 and v1:IsA("Sound")) and (p1 == "FishingRewardSFX" or p1 == "FishingBarLevelSFX") then
+			local Sound = Instance.new("Sound")
+
+			Sound.Name = p1
+			Sound.SoundId = if p1 == "FishingBarLevelSFX" then "rbxassetid://8208591201" else "rbxassetid://112485797063762"
+			Sound.Volume = 1
+			Sound.Parent = SoundService
+			v1 = Sound
+		end
+
+		if not (v1 and v1:IsA("Sound")) then
+			return
+		end
+
+		local SFX = SoundService:FindFirstChild("SFX")
+		local v3
+
+		if SFX and SFX:IsA("SoundGroup") then
+			v3 = SFX
+		else
+			local SFX2 = Instance.new("SoundGroup")
+
+			SFX2.Name = "SFX"
+			SFX2.Parent = SoundService
+			v3 = SFX2
+		end
+
+		v1.SoundGroup = v3
+
+		local v4 = v1:Clone()
+
+		v4.SoundGroup = v3
+
+		if p2 then
+			v4.PlaybackSpeed = math.clamp(tonumber(p2) or 1, 0.5, 2.5)
+		end
+
+		if p1 == "FishingCircleHit" then
+			v4.Volume = math.min(10, v4.Volume * 1.45)
+		elseif p1 == "FishingCircleMiss" then
+			v4.Volume = math.min(10, v4.Volume * 0.65)
+		elseif p1 == "FishingBiteSFX" then
+			v4.Volume = math.min(10, v4.Volume * 0.27)
+		elseif p1 == "FishingWaterTouchSFX" then
+			v4.Volume = math.min(10, v4.Volume * 2.5)
+		end
+
+		v4.Parent = SoundService
+		SoundService:PlayLocalSound(v4)
+		Debris:AddItem(v4, math.max(v4.TimeLength, 1) + 0.5)
+	end
+
+	local function stopFishingRhythmLoop() --[[ stopFishingRhythmLoop | Line: 1654 | Upvalues: v27 (ref) ]]
+		local v1 = v27
+
+		v27 = nil
+
+		if not v1 then
+			return
+		end
+
+		v1:Stop()
+		v1:Destroy()
+	end
+
+	startFishingRhythmLoop = function() --[[ startFishingRhythmLoop | Line: 1663 | Upvalues: v27 (ref), SoundService (copy) ]]
+		local v1 = v27
+
+		v27 = nil
+
+		if v1 then
+			v1:Stop()
+			v1:Destroy()
+		end
+
+		local FishingRhythmLoopSFX = SoundService:FindFirstChild("FishingRhythmLoopSFX")
+
+		if not (FishingRhythmLoopSFX and FishingRhythmLoopSFX:IsA("Sound")) then
+			return
+		end
+
+		local SFX = SoundService:FindFirstChild("SFX")
+		local v2
+
+		if SFX and SFX:IsA("SoundGroup") then
+			v2 = SFX
+		else
+			local SFX2 = Instance.new("SoundGroup")
+
+			SFX2.Name = "SFX"
+			SFX2.Parent = SoundService
+			v2 = SFX2
+		end
+
+		FishingRhythmLoopSFX.SoundGroup = v2
+
+		local v3 = FishingRhythmLoopSFX:Clone()
+
+		v3.SoundGroup = v2
+		v3.Looped = true
+		v3.TimePosition = 0.4
+		v3.Parent = SoundService
+		v27 = v3
+		SoundService:PlayLocalSound(v3)
+	end
+
+	local function getFishingRewardWorldPath(p1, p2) --[[ getFishingRewardWorldPath | Line: 1679 | Upvalues: LocalPlayer (copy) ]]
+		local Character = LocalPlayer.Character
+		local v1 = if Character then Character:FindFirstChild("HumanoidRootPart") else Character
+		local v2 = if Character then Character:FindFirstChild("RightHand") or (Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightLowerArm")) else Character
+		local v3 = if typeof(p2) == "Vector3" then p2 elseif v2 and v1 then v2.Position + v1.CFrame.LookVector * 4.7 + v1.CFrame.RightVector * 0.25 + Vector3.new(0, 0.35, 0) else v2 and v2.Position or (v1 and v1.Position + Vector3.new(1.2, 1.5, 0) or Vector3.new(0, 6, 0))
+		local v5 = v1 and v1.Position + Vector3.new(0, 2.65, 0) or v3 + Vector3.new(0, 3, -5)
+		local v6 = if p1 % 2 == 0 then 1 else -1
+		local v7 = v1 and v1.CFrame.RightVector or Vector3.new(1, 0, 0)
+		local v8 = (v3 + v5) * 0.5 + v7 * v6 * math.random(25, 55) / 10
+		local v10 = v8 + Vector3.new(0, math.random(42, 68) / 10, 0)
+		local v11 = v7 * v6 * math.random(8, 18) / 10
+
+		return v3, v10, v5, v11 + Vector3.new(0, math.random(-5, 8) / 10, 0)
+	end
+
+	local function makeFishingRewardOrbPart() --[[ makeFishingRewardOrbPart | Line: 1699 | Upvalues: Workspace (copy) ]]
+		local FishingRewardOrb = Instance.new("Part")
+
+		FishingRewardOrb.Name = "FishingRewardOrb"
+		FishingRewardOrb.Shape = Enum.PartType.Ball
+		FishingRewardOrb.Size = Vector3.new(0.55, 0.55, 0.55)
+		FishingRewardOrb.Material = Enum.Material.Neon
+		FishingRewardOrb.Color = Color3.fromRGB(255, 230, 64)
+		FishingRewardOrb.Transparency = 0
+		FishingRewardOrb.Anchored = true
+		FishingRewardOrb.CanCollide = false
+		FishingRewardOrb.CanTouch = false
+		FishingRewardOrb.CanQuery = false
+		FishingRewardOrb.CastShadow = false
+
+		local TrailFront = Instance.new("Attachment")
+
+		TrailFront.Name = "TrailFront"
+		TrailFront.Position = Vector3.new(0, 0, -0.28)
+		TrailFront.Parent = FishingRewardOrb
+
+		local TrailBack = Instance.new("Attachment")
+
+		TrailBack.Name = "TrailBack"
+		TrailBack.Position = Vector3.new(0, 0, 0.28)
+		TrailBack.Parent = FishingRewardOrb
+
+		local RewardTrail = Instance.new("Trail")
+
+		RewardTrail.Name = "RewardTrail"
+		RewardTrail.Attachment0 = TrailBack
+		RewardTrail.Attachment1 = TrailFront
+		RewardTrail.FaceCamera = true
+		RewardTrail.LightEmission = 1
+		RewardTrail.Lifetime = 0.62
+		RewardTrail.MinLength = 0.04
+		RewardTrail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(0.18, 0.92), NumberSequenceKeypoint.new(1, 0) })
+		RewardTrail.Color = ColorSequence.new(Color3.fromRGB(255, 248, 126), Color3.fromRGB(255, 176, 38))
+		RewardTrail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.04), NumberSequenceKeypoint.new(0.72, 0.2), NumberSequenceKeypoint.new(1, 1) })
+		RewardTrail.Parent = FishingRewardOrb
+
+		local Glow = Instance.new("PointLight")
+
+		Glow.Name = "Glow"
+		Glow.Color = Color3.fromRGB(255, 224, 80)
+		Glow.Brightness = 2.2
+		Glow.Range = 7
+		Glow.Parent = FishingRewardOrb
+		FishingRewardOrb.Parent = Workspace
+
+		return FishingRewardOrb
+	end
+
+	local function spawnFishingRewardOrb(p1, p2) --[[ spawnFishingRewardOrb | Line: 1755 | Upvalues: getFishingRewardWorldPath (copy), makeFishingRewardOrbPart (copy), RunService (copy), Debris (copy) ]]
+		local v1, v2, v3, v4 = getFishingRewardWorldPath(p1, p2)
+		local v5 = makeFishingRewardOrbPart()
+		local v6 = os.clock()
+		local v7 = nil
+
+		v5.CFrame = CFrame.new(v1)
+		v7 = RunService.RenderStepped:Connect(function() --[[ Line: 1762 | Upvalues: v6 (copy), v1 (copy), v4 (copy), v2 (copy), v3 (copy), v5 (copy), v7 (ref) ]]
+			local v22 = math.clamp((os.clock() - v6) / 1.12, 0, 1)
+			local v32
+
+			if v22 < 0.12 then
+				v32 = v1 + v4 * math.sin(v22 / 0.12 * math.pi)
+			else
+				local v42 = math.clamp((v22 - 0.12) / 0.88, 0, 1)
+				local v52
+
+				if v42 < 0.5 then
+					v52 = v42 * 16 * v42 * v42 * v42 * v42
+				else
+					local v62 = v42 * -2 + 2
+
+					v52 = 1 - v62 * v62 * v62 * v62 * v62 / 2
+				end
+
+				local v72 = 1 - v52
+
+				v32 = v1 * (v72 * v72) + v2 * (v72 * 2 * v52) + v3 * (v52 * v52)
+			end
+
+			v5.CFrame = CFrame.new(v32)
+
+			if v22 >= 0.78 then
+				v5.Transparency = math.clamp((v22 - 0.78) / 0.22, 0, 1)
+
+				local Glow = v5:FindFirstChild("Glow")
+
+				if Glow and Glow:IsA("PointLight") then
+					Glow.Brightness = math.max(0, 2.2 * (1 - v5.Transparency))
+				end
+			end
+
+			if not (v22 >= 1) then
+				return
+			end
+
+			if v7 then
+				v7:Disconnect()
+			end
+
+			v5:Destroy()
+		end)
+		Debris:AddItem(v5, 1.62)
+	end
+
+	playFishingRewardSequence = function(p1, p2) --[[ playFishingRewardSequence | Line: 1797 | Upvalues: playFishingSound (copy), spawnFishingRewardOrb (copy) ]]
+		if type(p1) ~= "table" or #p1 <= 0 then
+			return
+		end
+
+		for i, v in ipairs(p1) do
+			task.delay((i - 1) * 0.14, function() --[[ Line: 1802 | Upvalues: playFishingSound (ref), spawnFishingRewardOrb (ref), i (copy), p2 (copy) ]]
+				playFishingSound("FishingRewardSFX")
+				spawnFishingRewardOrb(i, p2)
+			end)
+		end
+	end
+
+	local function getStageBarColor(p1) --[[ getStageBarColor | Line: 1809 | Upvalues: t6 (copy) ]]
+		return t6[math.clamp(math.floor(tonumber(p1) or 1), 1, #t6)] or t6[1]
+	end
+
+	local function getStageStrokeColor(p1) --[[ getStageStrokeColor | Line: 1813 | Upvalues: t6 (copy), t7 (copy), Color (ref) ]]
+		local v2 = math.floor(tonumber(p1) or 1)
+
+		return t7[math.clamp(v2, 1, #t6)] or Color or Color3.fromRGB(255, 255, 255)
+	end
+
+	local function updateRewardStrokeForStage(p1) --[[ updateRewardStrokeForStage | Line: 1818 | Upvalues: UIStroke2 (ref), t6 (copy), t7 (copy), Color (ref), Transparency (ref) ]]
+		if not (UIStroke2 and UIStroke2.Parent) then
+			return
+		end
+
+		local v5 = t7[math.clamp(math.floor(tonumber(p1) or 1), 1, #t6)]
+
+		if not v5 then
+			v5 = Color
+
+			if not v5 then
+				v5 = Color3.fromRGB(255, 255, 255)
+			end
+		end
+
+		UIStroke2.Color = v5
+		UIStroke2.Transparency = Transparency or UIStroke2.Transparency
+	end
+
+	local function removeFillCorners(p1) --[[ removeFillCorners | Line: 1825 ]]
+		for i, v in ipairs(p1:GetChildren()) do
+			if v:IsA("UICorner") then
+				v:Destroy()
+			end
+		end
+	end
+
+	local function applyStageGradientToFill(p1, p2) --[[ applyStageGradientToFill | Line: 1833 | Upvalues: t4 (copy) ]]
+		if not p1 then
+			return
+		end
+
+		for i, v in ipairs(p1:GetChildren()) do
+			if v:IsA("UIGradient") then
+				v:Destroy()
+			end
+		end
+
+		local v1 = t4[p2]
+
+		if not v1 then
+			return
+		end
+
+		local v2 = v1:Clone()
+
+		v2.Name = "StageGradient" .. tostring(p2)
+		v2.Enabled = true
+		v2.Parent = p1
+	end
+
+	local function refreshRewardBarLayout(p1) --[[ refreshRewardBarLayout | Line: 1851 | Upvalues: Workspace (copy), UserInputService (copy), FishingRewardBar (copy), getInventoryItemCount (copy), Label (ref), scaleFishingStrokes (copy) ]]
+		local v2 = if UserInputService.TouchEnabled and (Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+
+		if v2 == "Phone" then
+			FishingRewardBar.Size = UDim2.fromScale(0.38, 0.028)
+		elseif v2 == "Tablet" then
+			FishingRewardBar.Size = UDim2.fromScale(0.33, 0.027)
+		else
+			FishingRewardBar.Size = UDim2.fromScale(0.29, 0.026)
+		end
+
+		local v3 = 0.84
+
+		if v2 == "Phone" and getInventoryItemCount() > 0 then
+			v3 = 0.805
+		elseif v2 == "Tablet" and getInventoryItemCount() > 0 then
+			v3 = 0.815
+		end
+
+		FishingRewardBar.Position = UDim2.fromScale(0.5, v3)
+		FishingRewardBar.ClipsDescendants = true
+
+		if not (Label and Label.Parent) then
+			scaleFishingStrokes(FishingRewardBar)
+
+			return
+		end
+
+		Label.AnchorPoint = Vector2.new(0.5, 0.5)
+		Label.Position = UDim2.fromScale(0.5, 0.5)
+		Label.Size = UDim2.fromScale(1, 1)
+		scaleFishingStrokes(FishingRewardBar)
+	end
+
+	local function ensureRewardStageFills(p1) --[[ ensureRewardStageFills | Line: 1876 | Upvalues: applyRewardTemplate (copy), t6 (copy), FishingRewardBar (copy), Fill (ref), t3 (copy), Scale2 (ref), Offset2 (ref), removeFillCorners (copy), applyStageGradientToFill (copy), Label (ref), refreshRewardBarLayout (copy) ]]
+		applyRewardTemplate()
+
+		local v3 = math.max(1, tonumber(p1) or #t6)
+
+		for i, v in ipairs(FishingRewardBar:GetChildren()) do
+			if v.Name:match("^StageBar") then
+				v:Destroy()
+			end
+		end
+
+		for i = 1, #t6 do
+			local v4
+			local v5 = i == 1 and Fill or t3[i]
+
+			if i > 1 and not (v5 and v5.Parent) then
+				local Frame = Instance.new("Frame")
+
+				Frame.Name = "FillStage" .. tostring(i)
+
+				if Fill then
+					v4 = Fill.BorderSizePixel
+
+					if v4 then
+						v5 = Frame
+					else
+						v5 = Frame
+						v4 = 0
+					end
+				else
+					v5 = Frame
+					v4 = 0
+				end
+
+				v5.BorderSizePixel = v4
+				v5.BackgroundTransparency = Fill and Fill.BackgroundTransparency or 0
+				v5.ClipsDescendants = true
+				v5.Parent = FishingRewardBar
+			end
+
+			if v5 and v5.Parent then
+				t3[i] = v5
+				v5.AnchorPoint = Vector2.new(0, Fill and Fill.AnchorPoint.Y or 0.5)
+				v5.Position = UDim2.new(0, 0, Scale2, Offset2)
+				v5.BorderSizePixel = Fill and Fill.BorderSizePixel or 0
+				v5.BackgroundTransparency = Fill and Fill.BackgroundTransparency or 0
+				v5.BackgroundColor3 = t6[math.clamp(math.floor(tonumber(i) or 1), 1, #t6)] or t6[1]
+				v5.ClipsDescendants = true
+				v5.ZIndex = FishingRewardBar.ZIndex + i
+				v5.Visible = if i <= v3 then true else false
+
+				if i > 1 then
+					removeFillCorners(v5)
+				end
+
+				applyStageGradientToFill(v5, i)
+			end
+		end
+
+		if Label and Label.Parent then
+			Label.ZIndex = FishingRewardBar.ZIndex + #t6 + 2
+		end
+
+		refreshRewardBarLayout(v3)
+	end
+
+	resetRewardStageFills = function(p1) --[[ resetRewardStageFills | Line: 1916 | Upvalues: ensureRewardStageFills (copy), t3 (copy), Scale (ref), Offset (ref), Scale2 (ref), Offset2 (ref) ]]
+		ensureRewardStageFills(p1)
+
+		for k, v in pairs(t3) do
+			if v and v.Parent then
+				v.Size = UDim2.new(0, 0, Scale, Offset)
+				v.Position = UDim2.new(0, 0, Scale2, Offset2)
+			end
+		end
+	end
+
+	local function calculateFishingRewardProgress(p1, p2) --[[ calculateFishingRewardProgress | Line: 1926 ]]
+		local v1 = p1 and math.max(1, (math.floor(tonumber(p1.stageCount) or 1))) or 1
+		local t = {}
+		local sum = 0
+
+		if p1 and (p1.stageScores and p1.stageTotals) then
+			for i = 1, v1 do
+				local v6 = math.max(1, tonumber(p1.stageTotals[i]) or 1)
+
+				sum = sum + math.clamp(tonumber(p1.stageScores[i]) or 0, 0, v6)
+			end
+		else
+			sum = math.clamp(tonumber(p2) or 0, 0, 1) * v1
+		end
+
+		local sum2, sum3 = sum, 0
+
+		for j = 1, v1 do
+			local v10
+
+			v10 = p1 and p1.stageTotals and tonumber(p1.stageTotals[j]) or 1
+
+			local v13 = math.max(1, v10)
+			local v14 = math.clamp(sum2, 0, v13)
+			local v15 = v13 > 0 and v14 / v13 or 0
+
+			t[j] = v15
+			sum2 = sum2 - v14
+			sum3 = sum3 + v15
+		end
+
+		return sum3, t, v1
+	end
+
+	updateRewardBar = function(p1, p2, p3) --[[ updateRewardBar | Line: 1952 | Upvalues: t6 (copy), calculateFishingRewardProgress (copy), ensureRewardStageFills (copy), t3 (copy), playFishingSound (copy), TweenService (copy), Scale (ref), Offset (ref), Scale2 (ref), Offset2 (ref), UIStroke2 (ref), t7 (copy), Color (ref), Transparency (ref), Label (ref) ]]
+		local v2 = math.clamp(tonumber(p1) or 0, 0, 1)
+
+		math.clamp(math.floor(tonumber(p2) or 1), 1, #t6)
+
+		local _, v6, v7 = calculateFishingRewardProgress(p3, v2)
+
+		ensureRewardStageFills(v7)
+
+		local v8 = 1
+		local v9 = 0
+
+		for i = 1, #t6 do
+			local v10
+			local v11 = t3[i]
+
+			if v11 and v11.Parent then
+				if i <= v7 then
+					local v13 = math.clamp(v6[i] or 0, 0, 1)
+
+					if v13 > 0 then
+						v10 = v13
+						v8 = i
+						v9 = v13
+					else
+						v10 = v13
+					end
+
+					if p3 and v10 >= 1 then
+						p3.rewardBarLevelPlayed = p3.rewardBarLevelPlayed or {}
+
+						if not p3.rewardBarLevelPlayed[i] then
+							p3.rewardBarLevelPlayed[i] = true
+							playFishingSound("FishingBarLevelSFX", (i - 1) * 0.12 + 1)
+						end
+					end
+				else
+					v10 = 0
+				end
+
+				v11.BackgroundColor3 = t6[math.clamp(math.floor(tonumber(i) or 1), 1, #t6)] or t6[1]
+				TweenService:Create(v11, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Size = UDim2.new(v10, 0, Scale, Offset),
+					Position = UDim2.new(0, 0, Scale2, Offset2)
+				}):Play()
+			end
+		end
+
+		if UIStroke2 and UIStroke2.Parent then
+			local v24 = t7[math.clamp(math.floor(tonumber(v8) or 1), 1, #t6)]
+
+			if not v24 then
+				v24 = Color
+
+				if not v24 then
+					v24 = Color3.fromRGB(255, 255, 255)
+				end
+			end
+
+			UIStroke2.Color = v24
+			UIStroke2.Transparency = Transparency or UIStroke2.Transparency
+		end
+
+		if not (Label and Label.Parent) then
+			return
+		end
+
+		Label.Text = tostring((math.floor(v9 * 100 + 0.5))) .. "%"
+	end
+
+	local function getNoteCircleSize(p1) --[[ getNoteCircleSize | Line: 1991 | Upvalues: Workspace (copy), UserInputService (copy) ]]
+		local v2 = tonumber(if p1 then p1.size else p1) or 0.155
+		local CurrentCamera = Workspace.CurrentCamera
+		local v4 = if UserInputService.TouchEnabled and (CurrentCamera and CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+
+		if v4 == "Phone" then
+			return math.clamp(v2, 0.085, 0.13)
+		end
+
+		if v4 == "Tablet" then
+			return math.clamp(v2, 0.1, 0.145)
+		end
+
+		return math.clamp(v2, 0.095, 0.17)
+	end
+
+	local function getNoteApproachTime(p1, p2) --[[ getNoteApproachTime | Line: 2002 ]]
+		local v2 = if p1 then p1.approachTime else p1
+
+		return math.max(0.35, tonumber(v2) or (tonumber(p2) or 0.9))
+	end
+
+	local function getNoteHitWindows(p1, p2) --[[ getNoteHitWindows | Line: 2006 | Upvalues: t5 (copy) ]]
+		local v2 = tonumber(if p1 then p1.stage else p1)
+
+		if not v2 and p2 then
+			v2 = tonumber(p2.currentStage)
+		end
+
+		return t5[math.clamp(math.floor(v2 or 1), 1, #t5)] or t5[1]
+	end
+
+	local function getNoteMissWindow(p1, p2) --[[ getNoteMissWindow | Line: 2015 | Upvalues: t5 (copy) ]]
+		local v2 = tonumber(if p1 then p1.stage else p1)
+
+		if not v2 and p2 then
+			v2 = tonumber(p2.currentStage)
+		end
+
+		local meh = (t5[math.clamp(math.floor(v2 or 1), 1, #t5)] or t5[1]).meh
+
+		return tonumber(meh) or 0.22
+	end
+
+	updateRhythmStageBar = function(p1, p2) --[[ updateRhythmStageBar | Line: 2020 | Upvalues: updateRewardBar (copy) ]]
+		if not p1 then
+			return
+		end
+
+		local v4 = math.clamp(math.floor(tonumber(p2) or (p1.currentStage or 1)), 1, p1.stageCount or 1)
+
+		p1.currentStage = v4
+		updateRewardBar((p1.stageScores[v4] or 0) / math.max(1, p1.stageTotals[v4] or 1), v4, p1)
+	end
+	clearRhythm = function(p1) --[[ clearRhythm | Line: 2031 | Upvalues: v25 (ref), v27 (ref), v26 (ref), FishingRhythmLayer (copy), FishingRewardBar (copy), calculateFishingRewardProgress (copy), FishingRequest (copy) ]]
+		local v1 = v25
+
+		v25 = nil
+
+		local v2 = v27
+
+		v27 = nil
+
+		if v2 then
+			v2:Stop()
+			v2:Destroy()
+		end
+
+		if v26 then
+			v26:Disconnect()
+			v26 = nil
+		end
+
+		for i, v in ipairs(FishingRhythmLayer:GetChildren()) do
+			if v.Name == "FishingHitCircle" or (v.Name == "FishingApproachCircle" or (v.Name == "FishingHitBurst" or v.Name == "FishingJudgementText")) then
+				v:Destroy()
+			end
+		end
+
+		FishingRhythmLayer.Visible = false
+		FishingRewardBar.Visible = false
+
+		if not (v1 and p1) then
+			return
+		end
+
+		local v3 = v1.total > 0 and v1.score / v1.total or 0
+
+		if v1.stageCount and (v1.stageScores and v1.stageTotals) then
+			local v4, _, v5 = calculateFishingRewardProgress(v1, v3)
+
+			v3 = v4 / math.max(1, v5)
+		end
+
+		FishingRequest:FireServer("RhythmResult", {
+			token = v1.token,
+			score = v3
+		})
+	end
+end
+
+local function fadeGuiStroke(p1, p2) --[[ fadeGuiStroke | Line: 2059 | Upvalues: TweenService (copy) ]]
+	if not p1 then
+		return
+	end
+
+	for i, v in ipairs(p1:GetDescendants()) do
+		if v:IsA("UIStroke") then
+			TweenService:Create(v, TweenInfo.new(p2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Transparency = 1
+			}):Play()
+		end
+	end
+end
+
+local function createHitBurst(p1, p2, p3) --[[ createHitBurst | Line: 2070 | Upvalues: FishingRhythmLayer (copy), scaleFishingStrokes (copy), TweenService (copy), Debris (copy) ]]
+	if not (p1 and p1.Parent) then
+		return
+	end
+
+	local FishingHitBurst = Instance.new("Frame")
+
+	FishingHitBurst.Name = "FishingHitBurst"
+	FishingHitBurst.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingHitBurst.Position = p1.Position
+	FishingHitBurst.Size = p1.Size
+	FishingHitBurst.BackgroundTransparency = 1
+	FishingHitBurst.ZIndex = 23
+	FishingHitBurst.Parent = FishingRhythmLayer
+
+	local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+
+	UIAspectRatioConstraint.AspectRatio = 1
+	UIAspectRatioConstraint.Parent = FishingHitBurst
+
+	local UICorner = Instance.new("UICorner")
+
+	UICorner.CornerRadius = UDim.new(0.5, 0)
+	UICorner.Parent = FishingHitBurst
+
+	local UIStroke = Instance.new("UIStroke")
+
+	UIStroke.Color = p2
+	UIStroke.Thickness = if p3 then 3 else 4
+	UIStroke.Transparency = if p3 then 0.08 else 0
+	UIStroke.Parent = FishingHitBurst
+	scaleFishingStrokes(FishingHitBurst)
+
+	local v3 = if p3 then 0.12090000000000001 else 0.2759
+
+	TweenService:Create(FishingHitBurst, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.fromScale(v3, v3)
+	}):Play()
+	TweenService:Create(UIStroke, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Transparency = 1
+	}):Play()
+	Debris:AddItem(FishingHitBurst, 0.26)
+end
+
+local function showJudgementText(p1, p2, p3) --[[ showJudgementText | Line: 2100 | Upvalues: FishingRhythmLayer (copy), scaleFishingStrokes (copy), TweenService (copy), Debris (copy) ]]
+	local FishingJudgementText = Instance.new("TextLabel")
+
+	FishingJudgementText.Name = "FishingJudgementText"
+	FishingJudgementText.AnchorPoint = Vector2.new(0.5, 1)
+	FishingJudgementText.Position = UDim2.new(p1.X.Scale, p1.X.Offset, p1.Y.Scale - 0.06, p1.Y.Offset)
+	FishingJudgementText.Size = UDim2.fromScale(0.14, 0.048)
+	FishingJudgementText.BackgroundTransparency = 1
+	FishingJudgementText.Text = p2
+	FishingJudgementText.TextColor3 = p3
+	FishingJudgementText.TextScaled = true
+	FishingJudgementText.Font = Enum.Font.FredokaOne
+	FishingJudgementText.TextStrokeTransparency = 1
+	FishingJudgementText.ZIndex = 25
+	FishingJudgementText.Parent = FishingRhythmLayer
+
+	local UIStroke = Instance.new("UIStroke")
+
+	UIStroke.Color = Color3.fromRGB(12, 18, 24)
+	UIStroke.Thickness = 2.4
+	UIStroke.Transparency = 0.15
+	UIStroke.Parent = FishingJudgementText
+	scaleFishingStrokes(FishingJudgementText)
+	TweenService:Create(FishingJudgementText, TweenInfo.new(0.36, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TextTransparency = 1,
+		Position = UDim2.new(FishingJudgementText.Position.X.Scale, FishingJudgementText.Position.X.Offset, FishingJudgementText.Position.Y.Scale - 0.045, FishingJudgementText.Position.Y.Offset)
+	}):Play()
+	TweenService:Create(UIStroke, TweenInfo.new(0.36, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Transparency = 1
+	}):Play()
+	Debris:AddItem(FishingJudgementText, 0.42)
+end
+
+local v45 = nil
+
+local function judgeNote(p1) --[[ judgeNote | Line: 2131 | Upvalues: v25 (ref), t5 (copy), v45 (ref), fadeGuiStroke (copy), Debris (copy), showJudgementText (copy), createHitBurst (copy), TweenService (copy), playFishingSound (copy), updateRhythmStageBar (copy) ]]
+	local v1 = v25
+
+	if not v1 or v1.judged[p1] then
+		return
+	end
+
+	local v2 = v1.notes[p1]
+
+	if not v2 then
+		return
+	end
+
+	local v3 = os.clock()
+	local v4 = tonumber(v2.hitAt)
+
+	if not v4 then
+		v4 = v1.startTime + (tonumber(v2.time) or 0)
+	end
+
+	local v7 = tonumber(if v2 then v2.stage else v2)
+
+	if not v7 and v1 then
+		v7 = tonumber(v1.currentStage)
+	end
+
+	local v11 = t5[math.clamp(math.floor(v7 or 1), 1, #t5)] or t5[1]
+	local v13 = tonumber(if v2 then v2.stage else v2)
+
+	if not v13 and v1 then
+		v13 = tonumber(v1.currentStage)
+	end
+
+	local meh = (t5[math.clamp(math.floor(v13 or 1), 1, #t5)] or t5[1]).meh
+	local v18 = tonumber(meh) or 0.22
+
+	if (tonumber(v2.deadlineAt) or v4 + v18) <= v3 then
+		v45(p1, true)
+
+		return
+	end
+
+	if v3 < v4 - 0.5 then
+		v45(p1, true)
+
+		return
+	end
+
+	if v3 < v4 - v18 then
+		return
+	end
+
+	local v20 = math.abs(v3 - v4)
+	local v21 = nil
+
+	if v20 <= v11.perfect then
+		v21 = 1
+	elseif v20 <= v11.good then
+		v21 = 0.66
+	elseif v20 <= v11.meh then
+		v21 = 0.33
+	end
+
+	if v21 == nil then
+		v45(p1, true)
+
+		return
+	end
+
+	v1.judged[p1] = true
+	v1.score = v1.score + v21
+	v1.judgedCount = v1.judgedCount + 1
+
+	local v252 = math.clamp(math.floor(tonumber(v2.stage) or v1.currentStage or 1), 1, v1.stageCount or 1)
+
+	v1.stageScores[v252] = (v1.stageScores[v252] or 0) + v21
+
+	local v26 = v1.approaches[p1]
+
+	if v26 then
+		fadeGuiStroke(v26, 0.08)
+		Debris:AddItem(v26, 0.1)
+		v1.approaches[p1] = nil
+	end
+
+	local v27 = v1.circles[p1]
+
+	if v27 then
+		v27.Active = false
+
+		local v28, v29
+
+		if v21 >= 1 then
+			v28, v29 = "Perfect", Color3.fromRGB(75, 190, 255)
+		elseif v21 >= 0.66 then
+			v28, v29 = "Good", Color3.fromRGB(105, 255, 150)
+		elseif v21 > 0 then
+			v28, v29 = "Meh", Color3.fromRGB(255, 230, 80)
+		else
+			v28, v29 = "Miss", Color3.fromRGB(255, 95, 95)
+		end
+
+		showJudgementText(v27.Position, v28, v29)
+		v27.BackgroundColor3 = v29
+		createHitBurst(v27, v29, if v21 <= 0 then true else false)
+		fadeGuiStroke(v27, 0.1)
+		TweenService:Create(v27, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(0.17, 0.17)
+		}):Play()
+		Debris:AddItem(v27, 0.13)
+		v1.circles[p1] = nil
+	end
+
+	playFishingSound(if v21 > 0 then "FishingCircleHit" else "FishingCircleMiss")
+	updateRhythmStageBar(v1, v252)
+end
+
+v45 = function(p1, p2) --[[ markMiss | Line: 2213 | Upvalues: v25 (ref), showJudgementText (copy), createHitBurst (copy), playFishingSound (copy), updateRhythmStageBar (copy) ]]
+	local v1 = v25
+
+	if not v1 or v1.judged[p1] then
+		return
+	end
+
+	v1.judged[p1] = true
+	v1.judgedCount = v1.judgedCount + 1
+
+	local v2 = v1.notes[p1]
+	local v7 = math.clamp(math.floor(tonumber(if v2 then v2.stage else v2) or (v1.currentStage or 1)), 1, v1.stageCount or 1)
+
+	v1.stageScores[v7] = v1.stageScores[v7] or 0
+
+	local v8 = v1.approaches[p1]
+
+	if v8 then
+		v8.Visible = false
+		v8:Destroy()
+		v1.approaches[p1] = nil
+	end
+
+	local v9 = v1.circles[p1]
+
+	if v9 then
+		v9.Active = false
+		v9.Selectable = false
+		showJudgementText(v9.Position, "Miss", Color3.fromRGB(255, 95, 95))
+
+		if not p2 then
+			createHitBurst(v9, Color3.fromRGB(255, 95, 95), true)
+		end
+
+		playFishingSound("FishingCircleMiss")
+		v9.Visible = false
+		v9:Destroy()
+		v1.circles[p1] = nil
+	end
+
+	updateRhythmStageBar(v1, v7)
+end
+
+local function spawnHitCircle(p1, p2, p3) --[[ spawnHitCircle | Line: 2245 | Upvalues: v25 (ref), Workspace (copy), UserInputService (copy), t5 (copy), v45 (ref), updateRhythmStageBar (copy), FishingRhythmLayer (copy), scaleFishingStrokes (copy), TweenService (copy), fadeGuiStroke (copy), Debris (copy), judgeNote (copy) ]]
+	local v1 = v25
+
+	if not v1 then
+		return
+	end
+
+	local v2 = UDim2.fromScale(p2.x, p2.y)
+	local v4 = tonumber(if p2 then p2.size else p2) or 0.155
+	local CurrentCamera = Workspace.CurrentCamera
+	local v6 = if UserInputService.TouchEnabled and (CurrentCamera and CurrentCamera.ViewportSize or Vector2.new(1280, 720)).X < 760 then "Phone" elseif UserInputService.TouchEnabled then "Tablet" else "Desktop"
+	local v7 = if v6 == "Phone" then math.clamp(v4, 0.085, 0.13) elseif v6 == "Tablet" then math.clamp(v4, 0.1, 0.145) else math.clamp(v4, 0.095, 0.17)
+	local v14 = math.clamp(math.floor(tonumber(p2.stage) or v1.currentStage or 1), 1, v1.stageCount or 1)
+	local t = {}
+
+	t.approachTime = v1.stageApproachTimes and v1.stageApproachTimes[v14]
+
+	local v17 = if t then t.approachTime else t
+	local v19 = math.max(0.35, tonumber(v17) or (tonumber(p3) or 0.9))
+	local v20 = tonumber(p2.hitAt)
+
+	if not v20 then
+		v20 = v1.startTime + (tonumber(p2.time) or 0)
+	end
+
+	local v23 = tonumber(if p2 then p2.stage else p2)
+
+	if not v23 and v1 then
+		v23 = tonumber(v1.currentStage)
+	end
+
+	local meh = (t5[math.clamp(math.floor(v23 or 1), 1, #t5)] or t5[1]).meh
+	local v27 = tonumber(meh) or 0.22
+	local v28 = tonumber(p2.deadlineAt) or v20 + v27
+
+	p2.hitAt = v20
+	p2.deadlineAt = v28
+
+	if v28 <= os.clock() then
+		v45(p1, true)
+
+		return
+	end
+
+	if v1.currentStage ~= v14 then
+		updateRhythmStageBar(v1, v14)
+	end
+
+	local FishingApproachCircle = Instance.new("Frame")
+
+	FishingApproachCircle.Name = "FishingApproachCircle"
+	FishingApproachCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingApproachCircle.Position = v2
+	FishingApproachCircle.Size = UDim2.fromScale(v7 * 2.45, v7 * 2.45)
+	FishingApproachCircle.BackgroundTransparency = 1
+
+	local v29 = 4000 - math.min(p1, 3500)
+
+	FishingApproachCircle.ZIndex = v29 - 2
+	FishingApproachCircle.Parent = FishingRhythmLayer
+
+	local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+
+	UIAspectRatioConstraint.AspectRatio = 1
+	UIAspectRatioConstraint.Parent = FishingApproachCircle
+
+	local UICorner = Instance.new("UICorner")
+
+	UICorner.CornerRadius = UDim.new(0.5, 0)
+	UICorner.Parent = FishingApproachCircle
+
+	local UIStroke = Instance.new("UIStroke")
+
+	UIStroke.Color = Color3.fromRGB(210, 245, 255)
+	UIStroke.Thickness = 4
+	UIStroke.Transparency = 0.03
+	UIStroke.Parent = FishingApproachCircle
+
+	local FishingHitCircle = Instance.new("TextButton")
+
+	FishingHitCircle.Name = "FishingHitCircle"
+	FishingHitCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+	FishingHitCircle.Position = v2
+	FishingHitCircle.Size = UDim2.fromScale(v7 * 0.82, v7 * 0.82)
+	FishingHitCircle.BackgroundColor3 = Color3.fromRGB(80, 195, 255)
+	FishingHitCircle.BackgroundTransparency = 0.08
+	FishingHitCircle.BorderSizePixel = 0
+	FishingHitCircle.Text = ""
+	FishingHitCircle.AutoButtonColor = false
+	FishingHitCircle.ZIndex = v29
+	FishingHitCircle.Parent = FishingRhythmLayer
+
+	local UIAspectRatioConstraint2 = Instance.new("UIAspectRatioConstraint")
+
+	UIAspectRatioConstraint2.AspectRatio = 1
+	UIAspectRatioConstraint2.Parent = FishingHitCircle
+
+	local UISizeConstraint = Instance.new("UISizeConstraint")
+
+	UISizeConstraint.MinSize = Vector2.new(0, 0)
+	UISizeConstraint.MaxSize = Vector2.new(10000, 10000)
+	UISizeConstraint.Parent = FishingHitCircle
+
+	local UICorner2 = Instance.new("UICorner")
+
+	UICorner2.CornerRadius = UDim.new(0.5, 0)
+	UICorner2.Parent = FishingHitCircle
+
+	local UIStroke2 = Instance.new("UIStroke")
+
+	UIStroke2.Color = Color3.fromRGB(245, 252, 255)
+	UIStroke2.Thickness = 3
+	UIStroke2.Transparency = 0.02
+	UIStroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	UIStroke2.Parent = FishingHitCircle
+	scaleFishingStrokes(FishingApproachCircle)
+	scaleFishingStrokes(FishingHitCircle)
+	v1.circles[p1] = FishingHitCircle
+	v1.approaches[p1] = FishingApproachCircle
+	TweenService:Create(FishingApproachCircle, TweenInfo.new(v19, Enum.EasingStyle.Linear), {
+		Size = UDim2.fromScale(v7, v7)
+	}):Play()
+	task.delay(v19, function() --[[ Line: 2321 | Upvalues: v25 (ref), v1 (copy), p1 (copy), FishingApproachCircle (copy), fadeGuiStroke (ref), Debris (ref) ]]
+		if v25 ~= v1 or v1.approaches[p1] ~= FishingApproachCircle then
+			return
+		end
+
+		fadeGuiStroke(FishingApproachCircle, 0.08)
+		Debris:AddItem(FishingApproachCircle, 0.1)
+		v1.approaches[p1] = nil
+	end)
+	TweenService:Create(FishingHitCircle, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = UDim2.fromScale(v7, v7)
+	}):Play()
+	FishingHitCircle.MouseButton1Down:Connect(function() --[[ Line: 2329 | Upvalues: judgeNote (ref), p1 (copy) ]]
+		judgeNote(p1)
+	end)
+end
+
+local function startRhythm(p1) --[[ startRhythm | Line: 2334 | Upvalues: clearRhythm (copy), v25 (ref), FishingRhythmLayer (copy), applyRewardTemplate (copy), FishingRewardBar (copy), resetRewardStageFills (copy), updateRewardBar (copy), v24 (ref), FishingStatus (copy), UIStroke (copy), playFishingSound (copy), t5 (copy), v45 (ref), v27 (ref), startFishingRhythmLoop (copy), spawnHitCircle (copy), v26 (ref), RunService (copy) ]]
+	clearRhythm(false)
+
+	local v1 = typeof(p1.notes) == "table" and p1.notes or {}
+	local v2 = tonumber(p1.approachTime) or 0.9
+	local v5 = math.clamp(math.floor(tonumber(p1.stageCount) or 1), 1, 5)
+	local t = {}
+	local t2 = {}
+	local t3 = {}
+
+	for i = 1, v5 do
+		t[i] = 0
+		t2[i] = 0
+	end
+
+	for i, v in ipairs(v1) do
+		local v8 = math.clamp(math.floor(tonumber(v.stage) or 1), 1, v5)
+
+		v.stage = v8
+		t[v8] = (t[v8] or 0) + 1
+
+		local v9 = t3[v8]
+
+		if not v9 then
+			local v11 = if v then v.approachTime else v
+
+			v9 = math.max(0.35, tonumber(v11) or (tonumber(v2) or 0.9))
+		end
+
+		t3[v8] = v9
+	end
+
+	for i, v in ipairs(v1) do
+		local v13 = t3[v.stage]
+
+		if not v13 then
+			local v15 = if v then v.approachTime else v
+
+			v13 = math.max(0.35, tonumber(v15) or (tonumber(v2) or 0.9))
+		end
+
+		v.approachTime = v13
+		v.hitAt = nil
+		v.deadlineAt = nil
+	end
+
+	local t4 = {
+		score = 0,
+		judgedCount = 0,
+		currentStage = 1,
+		token = p1.token,
+		startTime = os.clock()
+	}
+
+	t4.duration = tonumber(p1.duration) or 7
+	t4.notes = v1
+	t4.total = #v1
+	t4.judged = {}
+	t4.circles = {}
+	t4.approaches = {}
+	t4.stageCount = v5
+	t4.stageTotals = t
+	t4.stageScores = t2
+	t4.stageApproachTimes = t3
+	t4.rewardBarLevelPlayed = {}
+	v25 = t4
+	FishingRhythmLayer.Visible = true
+	applyRewardTemplate()
+	FishingRewardBar.Visible = true
+	resetRewardStageFills(v5)
+	updateRewardBar(0, 1, v25)
+	Color3.fromRGB(255, 245, 170)
+
+	if v24 then
+		v24:Cancel()
+		v24 = nil
+	end
+
+	FishingStatus.Text = ""
+	FishingStatus.Visible = false
+	FishingStatus.TextTransparency = 1
+	UIStroke.Transparency = 1
+	playFishingSound("FishingBiteSFX")
+
+	for i, v in ipairs(v1) do
+		local v18 = if v then v.approachTime else v
+		local v20 = math.max(0.35, tonumber(v18) or (tonumber(v2) or 0.9))
+		local startTime = v25.startTime
+		local v22 = startTime + (tonumber(v.time) or 0)
+
+		v.hitAt = v22
+
+		local v23 = v25
+		local v252 = tonumber(if v then v.stage else v)
+
+		if not v252 and v23 then
+			v252 = tonumber(v23.currentStage)
+		end
+
+		local meh = (t5[math.clamp(math.floor(v252 or 1), 1, #t5)] or t5[1]).meh
+
+		v.deadlineAt = v22 + (tonumber(meh) or 0.22)
+		task.delay(math.max(0, v.deadlineAt - os.clock()), function() --[[ Line: 2387 | Upvalues: v25 (ref), p1 (copy), i (copy), v45 (ref) ]]
+			local v1 = v25
+
+			if not v1 or (v1.token ~= p1.token or v1.judged[i]) then
+				return
+			end
+
+			v45(i, true)
+		end)
+		task.delay(math.max(0, (tonumber(v.time) or 0) - v20), function() --[[ Line: 2393 | Upvalues: v25 (ref), p1 (copy), i (copy), v27 (ref), startFishingRhythmLoop (ref), spawnHitCircle (ref), v (copy), v2 (copy) ]]
+			if not v25 or (v25.token ~= p1.token or v25.judged[i]) then
+				return
+			end
+
+			if not v27 then
+				startFishingRhythmLoop()
+			end
+
+			spawnHitCircle(i, v, v2)
+		end)
+	end
+
+	v26 = RunService.RenderStepped:Connect(function() --[[ Line: 2402 | Upvalues: v25 (ref), v45 (ref), clearRhythm (ref) ]]
+		local v1 = v25
+
+		if not v1 then
+			return
+		end
+
+		local v2 = os.clock()
+
+		for i, v in ipairs(v1.notes) do
+			local v3 = tonumber(v.deadlineAt)
+
+			if not v3 then
+				v3 = v1.startTime + (tonumber(v.time) or 0) + 0.5
+			end
+
+			if not v1.judged[i] and v3 <= v2 then
+				v45(i, true)
+			end
+		end
+
+		if not (v1.startTime + v1.duration + 0.55 <= v2) then
+			return
+		end
+
+		clearRhythm(true)
+	end)
+end
+
+local t11 = {
+	humanoid = nil,
+	walkSpeed = nil,
+	jumpPower = nil,
+	jumpHeight = nil,
+	useJumpPower = nil,
+	connection = nil,
+	controls = nil,
+	controlsDisabled = false
+}
+
+local function v46(p1) --[[ setLocalMovementLocked | Line: 2431 | Upvalues: LocalPlayer (copy), t11 (copy), RunService (copy), v6 (ref), v46 (copy) ]]
+	if p1 then
+		local Character = LocalPlayer.Character
+		local v1 = Character and Character:FindFirstChildOfClass("Humanoid")
+
+		if not v1 then
+			return
+		end
+
+		if not t11.controls then
+			pcall(function() --[[ Line: 2439 | Upvalues: LocalPlayer (ref), t11 (ref) ]]
+				t11.controls = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+			end)
+		end
+
+		if t11.controls and not t11.controlsDisabled then
+			pcall(function() --[[ Line: 2445 | Upvalues: t11 (ref) ]]
+				t11.controls:Disable()
+			end)
+			t11.controlsDisabled = true
+		end
+
+		if t11.humanoid ~= v1 then
+			t11.humanoid = v1
+			t11.walkSpeed = v1.WalkSpeed
+			t11.jumpPower = v1.JumpPower
+			t11.jumpHeight = v1.JumpHeight
+			t11.useJumpPower = v1.UseJumpPower
+		end
+
+		v1.WalkSpeed = 0
+		v1.JumpPower = 0
+		v1.JumpHeight = 0
+
+		if t11.connection then
+			t11.connection:Disconnect()
+		end
+
+		t11.connection = RunService.RenderStepped:Connect(function() --[[ Line: 2463 | Upvalues: v6 (ref), v1 (copy), v46 (ref) ]]
+			if v6 and v1.Parent then
+				v1.WalkSpeed = 0
+				v1.JumpPower = 0
+				v1.JumpHeight = 0
+			else
+				v46(false)
+			end
+		end)
+	else
+		if t11.connection then
+			t11.connection:Disconnect()
+			t11.connection = nil
+		end
+
+		if t11.controls and t11.controlsDisabled then
+			pcall(function() --[[ Line: 2478 | Upvalues: t11 (ref) ]]
+				t11.controls:Enable()
+			end)
+		end
+
+		t11.controlsDisabled = false
+
+		local humanoid = t11.humanoid
+
+		if humanoid and humanoid.Parent then
+			if t11.useJumpPower ~= nil then
+				humanoid.UseJumpPower = t11.useJumpPower
+			end
+
+			if t11.walkSpeed then
+				humanoid.WalkSpeed = t11.walkSpeed
+			end
+
+			local v2 = tonumber(t11.jumpPower) or 50
+			local v3 = tonumber(t11.jumpHeight) or 7.2
+
+			if v2 <= 0 then
+				v2 = 50
+			end
+
+			if v3 <= 0 then
+				v3 = 7.2
+			end
+
+			humanoid.JumpPower = v2
+			humanoid.JumpHeight = v3
+		end
+
+		t11.humanoid = nil
+		t11.walkSpeed = nil
+		t11.jumpPower = nil
+		t11.jumpHeight = nil
+		t11.useJumpPower = nil
+	end
+end
+
+local function stopPose() --[[ stopPose | Line: 2510 | Upvalues: v21 (ref), v46 (copy) ]]
+	if v21 then
+		v21:Disconnect()
+		v21 = nil
+	end
+
+	v46(false)
+end
+
+local function startPose() --[[ startPose | Line: 2518 | Upvalues: v21 (ref), v46 (copy) ]]
+	if not v21 then
+		v46(false)
+		v46(true)
+
+		return
+	end
+
+	v21:Disconnect()
+	v21 = nil
+	v46(false)
+	v46(true)
+end
+
+FishButton.MouseEnter:Connect(function() --[[ Line: 2523 | Upvalues: TweenService (copy), v34 (copy), v9 (ref) ]]
+	local v3 = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local t = {}
+
+	t.Scale = if v9 then 1.07 else 0
+	TweenService:Create(v34, v3, t):Play()
+end)
+FishButton.MouseLeave:Connect(function() --[[ Line: 2526 | Upvalues: TweenService (copy), v34 (copy), v9 (ref) ]]
+	local v3 = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local t = {}
+
+	t.Scale = if v9 then 1 else 0
+	TweenService:Create(v34, v3, t):Play()
+end)
+
+if v2 then
+	v2.OnClientEvent:Connect(function(p1) --[[ Line: 2531 | Upvalues: v8 (ref), showPrompt (copy) ]]
+		if type(p1) == "table" and type(p1.Unlocked) == "table" then
+			v8 = p1.Unlocked.fishing == true
+		end
+
+		if v8 then
+			return
+		end
+
+		showPrompt(false)
+	end)
+end
+
+task.spawn(function() --[[ Line: 2539 | Upvalues: v1 (copy), v8 (ref) ]]
+	for i = 1, 12 do
+		if v1 then
+			local ok, result = pcall(function() --[[ Line: 164 | Upvalues: v1 (ref) ]]
+				return v1:InvokeServer()
+			end)
+
+			if ok and type(result) == "table" and type(result.Unlocked) == "table" then
+				v8 = result.Unlocked.fishing == true
+			end
+		end
+
+		if v8 then
+			break
+		end
+
+		task.wait(if i <= 5 then 1 else 3)
+	end
+end)
+FishingCancelButton.MouseEnter:Connect(function() --[[ Line: 2549 | Upvalues: TweenService (copy), v35 (copy), v44 (ref) ]]
+	local v3 = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local t = {}
+
+	t.Scale = if v44 then 1.07 else 0
+	TweenService:Create(v35, v3, t):Play()
+end)
+FishingCancelButton.MouseLeave:Connect(function() --[[ Line: 2552 | Upvalues: TweenService (copy), v35 (copy), v44 (ref) ]]
+	local v3 = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local t = {}
+
+	t.Scale = if v44 then 1 else 0
+	TweenService:Create(v35, v3, t):Play()
+end)
+FishButton.MouseButton1Click:Connect(function() --[[ Line: 2556 | Upvalues: v6 (ref), v7 (ref), v8 (ref), showPrompt (copy), v24 (ref), FishingStatus (copy), UIStroke (copy), v1 (copy), isNearWater (copy), FishingRequest (copy) ]]
+	if v6 or v7 then
+		return
+	end
+
+	if v8 then
+		if not isNearWater() then
+			showPrompt(false)
+
+			return
+		end
+
+		v7 = true
+		showPrompt(false)
+		Color3.fromRGB(190, 255, 190)
+
+		if v24 then
+			v24:Cancel()
+			v24 = nil
+		end
+
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+		FishingRequest:FireServer("Start")
+		task.delay(2, function() --[[ Line: 2574 | Upvalues: v7 (ref), v6 (ref), showPrompt (ref), isNearWater (ref) ]]
+			if not v7 or v6 then
+				return
+			end
+
+			v7 = false
+			showPrompt((isNearWater()))
+		end)
+	else
+		showPrompt(false)
+		Color3.fromRGB(255, 140, 120)
+
+		if v24 then
+			v24:Cancel()
+			v24 = nil
+		end
+
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+
+		if not v1 then
+			return
+		end
+
+		local ok, result = pcall(function() --[[ Line: 164 | Upvalues: v1 (ref) ]]
+			return v1:InvokeServer()
+		end)
+
+		if not ok or type(result) ~= "table" then
+			return
+		end
+
+		if type(result.Unlocked) ~= "table" then
+			return
+		end
+
+		v8 = result.Unlocked.fishing == true
+	end
+end)
+FishingCancelButton.MouseButton1Click:Connect(function() --[[ Line: 2582 | Upvalues: v6 (ref), v22 (ref), v24 (ref), FishingStatus (copy), UIStroke (copy), FishingRequest (copy) ]]
+	if not v6 or v22 then
+		return
+	end
+
+	v22 = true
+	Color3.fromRGB(255, 210, 210)
+
+	if not v24 then
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+		FishingRequest:FireServer("Cancel")
+
+		return
+	end
+
+	v24:Cancel()
+	v24 = nil
+	FishingStatus.Text = ""
+	FishingStatus.Visible = false
+	FishingStatus.TextTransparency = 1
+	UIStroke.Transparency = 1
+	FishingRequest:FireServer("Cancel")
+end)
+UserInputService.InputBegan:Connect(function(p1, p2) --[[ Line: 2591 | Upvalues: v6 (ref), v22 (ref), v24 (ref), FishingStatus (copy), UIStroke (copy), FishingRequest (copy) ]]
+	if p2 or not v6 then
+		return
+	end
+
+	if p1.KeyCode ~= Enum.KeyCode.ButtonB and p1.KeyCode ~= Enum.KeyCode.Escape or v22 then
+		return
+	end
+
+	v22 = true
+	Color3.fromRGB(255, 210, 210)
+
+	if v24 then
+		v24:Cancel()
+		v24 = nil
+	end
+
+	FishingStatus.Text = ""
+	FishingStatus.Visible = false
+	FishingStatus.TextTransparency = 1
+	UIStroke.Transparency = 1
+	FishingRequest:FireServer("Cancel")
+end)
+FishingState.OnClientEvent:Connect(function(p1) --[[ Line: 2604 | Upvalues: v7 (ref), v6 (ref), v22 (ref), v23 (ref), clearRhythm (copy), showPrompt (copy), showCancelButton (copy), setFishingHudHidden (copy), v46 (copy), v24 (ref), FishingStatus (copy), UIStroke (copy), playFishingSound (copy), v21 (ref), startRhythm (copy), v28 (ref), playFishingRewardSequence (copy) ]]
+	local v2 = if typeof(p1) == "table" then p1 or {} else {}
+	local state = v2.state
+
+	if state == "Started" then
+		v7 = false
+		v6 = true
+		v22 = false
+		v23 = true
+		clearRhythm(false)
+		showPrompt(false)
+		showCancelButton(true)
+		setFishingHudHidden(true)
+		v46(true)
+		Color3.fromRGB(190, 255, 190)
+
+		if v24 then
+			v24:Cancel()
+			v24 = nil
+		end
+
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+		playFishingSound("FishingCastSFX")
+
+		local v3 = task.delay
+
+		v3(tonumber(v2.castSeconds) or 0.38, function() --[[ Line: 2619 | Upvalues: v6 (ref), playFishingSound (ref) ]]
+			if not v6 then
+				return
+			end
+
+			playFishingSound("FishingWaterTouchSFX")
+		end)
+
+		if v21 then
+			v21:Disconnect()
+			v21 = nil
+		end
+
+		v46(false)
+		v46(true)
+	elseif state == "RhythmStart" then
+		v7 = false
+		v6 = true
+		v22 = false
+		v23 = false
+		showPrompt(false)
+		showCancelButton(false)
+		setFishingHudHidden(true)
+		v46(true)
+		startRhythm(v2)
+	elseif state == "Finished" then
+		v7 = false
+		v6 = false
+		v22 = false
+
+		local rewards = v2.rewards
+		local v4 = if type(rewards) == "table" then if #v2.rewards > 0 then true else false else false
+
+		if v4 then
+			v28 = math.max(v28, os.clock() + 5.4)
+		end
+
+		clearRhythm(false)
+
+		if v21 then
+			v21:Disconnect()
+			v21 = nil
+		end
+
+		v46(false)
+		showCancelButton(false)
+		showPrompt(false)
+		setFishingHudHidden(false)
+
+		local _ = v2.message or "Caught something!"
+
+		Color3.fromRGB(190, 235, 255)
+
+		if v24 then
+			v24:Cancel()
+			v24 = nil
+		end
+
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+
+		local rewardOrigin = v2.rewardOrigin
+
+		task.delay(0.18, function() --[[ Line: 2650 | Upvalues: playFishingRewardSequence (ref), v2 (ref), rewardOrigin (copy) ]]
+			playFishingRewardSequence(v2.rewards, rewardOrigin)
+		end)
+	else
+		if state == "Cancelled" then
+			v7 = false
+			v6 = false
+			v22 = false
+			clearRhythm(false)
+
+			if v21 then
+				v21:Disconnect()
+				v21 = nil
+			end
+
+			v46(false)
+			showCancelButton(false)
+			setFishingHudHidden(false)
+
+			local _ = v2.message or "Fishing cancelled"
+
+			Color3.fromRGB(255, 190, 190)
+		elseif state == "Denied" then
+			v7 = false
+			v6 = false
+			v22 = false
+			clearRhythm(false)
+
+			if v21 then
+				v21:Disconnect()
+				v21 = nil
+			end
+
+			v46(false)
+			showCancelButton(false)
+			setFishingHudHidden(false)
+
+			local _ = v2.message or "Stand closer to water"
+
+			Color3.fromRGB(255, 220, 160)
+		end
+
+		if v24 then
+			v24:Cancel()
+			v24 = nil
+		end
+
+		FishingStatus.Text = ""
+		FishingStatus.Visible = false
+		FishingStatus.TextTransparency = 1
+		UIStroke.Transparency = 1
+	end
+end)
+LocalPlayer.CharacterAdded:Connect(function() --[[ Line: 2674 | Upvalues: v6 (ref), v7 (ref), v22 (ref), v23 (ref), v21 (ref), v46 (copy), showPrompt (copy), showCancelButton (copy), setFishingHudHidden (copy), v13 (ref), v14 (ref), v15 (ref), v16 (ref), v17 (ref), refreshWaterParts (copy) ]]
+	v6 = false
+	v7 = false
+	v22 = false
+	v23 = false
+
+	if not v21 then
+		v46(false)
+		showPrompt(false)
+		showCancelButton(false)
+		setFishingHudHidden(false)
+		v13 = 0
+		v14 = nil
+		v15 = nil
+		v16 = -1
+		v17 = false
+		refreshWaterParts(true)
+
+		return
+	end
+
+	v21:Disconnect()
+	v21 = nil
+	v46(false)
+	showPrompt(false)
+	showCancelButton(false)
+	setFishingHudHidden(false)
+	v13 = 0
+	v14 = nil
+	v15 = nil
+	v16 = -1
+	v17 = false
+	refreshWaterParts(true)
+end)
+task.spawn(function() --[[ Line: 2687 | Upvalues: v9 (ref), v44 (ref), v25 (ref), v6 (ref), t11 (copy), refreshFishingButtonLayout (copy), setFishingHudHidden (copy), v46 (copy) ]]
+	while true do
+		repeat
+			while true do
+				while true do
+					local v2 = task.wait
+
+					v2(if v9 or (v44 or (v25 or (v6 or (t11.humanoid or t11.controlsDisabled)))) then 0.2 else 0.75)
+
+					if v9 or v44 then
+						refreshFishingButtonLayout()
+					end
+
+					if not v25 then
+						break
+					end
+
+					setFishingHudHidden(true)
+				end
+
+				if v6 then
+					setFishingHudHidden(true)
+				else
+					if not (t11.humanoid or t11.controlsDisabled) then
+						continue
+					end
+
+					v46(false)
+				end
+			end
+		until t11.humanoid or t11.controlsDisabled
+
+		v46(false)
+	end
+end)
+refreshWaterParts(true)
+task.spawn(function() --[[ Line: 2705 | Upvalues: v9 (ref), v44 (ref), v6 (ref), v7 (ref), refreshFishingButtonLayout (copy), showPrompt (copy), showCancelButton (copy), v23 (ref), v22 (ref), v8 (ref), v28 (ref), isNearWater (copy) ]]
+	while true do
+		local v2
+
+		while true do
+			local v1
+
+			while true do
+				while true do
+					task.wait(if v9 or (v44 or (v6 or v7)) then 0.25 else 0.75)
+
+					if v9 or v44 then
+						refreshFishingButtonLayout()
+					end
+
+					if v6 then
+						showPrompt(false)
+						v1 = showCancelButton
+						v2 = v23 and not v22
+						showCancelButton(v2)
+					else
+						if v7 then
+							showCancelButton(false)
+						else
+							showCancelButton(false)
+
+							if v8 and v28 <= os.clock() then
+								showPrompt((isNearWater()))
+
+								continue
+							end
+						end
+
+						showPrompt(false)
+					end
+				end
+			end
+
+			showPrompt((isNearWater()))
+		end
+
+		showPrompt(false)
+		v2 = v23 and not v22
+		showCancelButton(v2)
+	end
+end)
